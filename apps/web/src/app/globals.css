@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Design tokens — match prototype for visual consistency */
+  --paper: #fafbfc;
+  --paper-deep: #f1f5f9;
+  --paper-edge: #e2e8f0;
+  --ink: #0f172a;
+  --ink-soft: #334155;
+  --pencil: #94a3b8;
+  --pencil-soft: #cbd5e1;
+  --blue: #1e40af;
+  --blue-soft: #3b82f6;
+  --blue-deep: #1e3a8a;
+  --highlight: #dbeafe;
+}
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.view-hidden { display: none !important; }
+
+/* Rich text styles — TipTap output */
+.tiptap-content strong { font-weight: 700; }
+.tiptap-content em { font-style: italic; }
+.tiptap-content ul { padding-left: 1.25rem; margin: 0.25rem 0; }
+.tiptap-content a { color: var(--blue); border-bottom: 1px solid currentColor; }
+.tiptap-content p { margin: 0.25rem 0; }

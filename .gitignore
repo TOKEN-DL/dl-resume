@@ -51,6 +51,7 @@ prisma/migrations/dev.db*
 # Temp / scratch
 .tmp/
 .tmp-*/
+tools-scaffold/
 
 # Prototype artifacts
 prototype/extracted.js

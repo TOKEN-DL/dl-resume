@@ -1,0 +1,58 @@
+// 简历系统数据模型 — 阶段 0 占位,后续 issue 补充字段
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 用户 — 见 issue #1 F1
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   // Argon2id hash
+  name         String
+  isAdmin      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  resumes       Resume[]
+  encryptedDek  EncryptedDek?
+
+  @@map("users")
+}
+
+/// 简历主表 — 见 issue #2 F2
+/// 数据(data)字段在生产环境是 AES-256-GCM 密文(见 #12 F18)
+model Resume {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  template  String   @default("classic") // classic | modern | minimal
+  data      String   // JSON 字符串,生产环境是密文
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("resumes")
+}
+
+/// 加密数据密钥(包装后存储)— 见 #12 F18
+model EncryptedDek {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  // 用 KEK(用户密码派生)包装后的 DEK:{iv, ciphertext, tag}
+  wrappedKey      String
+  salt            String   // KEK 派生用的盐
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("encrypted_deks")
+}
