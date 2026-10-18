@@ -53,10 +53,8 @@ coverage/
 .tmp-*/
 tools-scaffold/
 
-# Prototype artifacts
-prototype/extracted.js
-prototype/*.bak
-prototype/node_modules/
+# Prototype artifacts (single-file HTML demo; local-only, double-click to view)
+prototype/
 
 # Vercel / deployment
 .vercel/
