@@ -1,0 +1,192 @@
+.auth-stage {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 90% 10%, rgba(30, 64, 175, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 10% 90%, rgba(219, 234, 254, 0.5), transparent 60%),
+    var(--paper);
+}
+
+@media (max-width: 1024px) {
+  .auth-stage { grid-template-columns: 1fr; }
+}
+
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  border-right: 1px solid var(--paper-edge);
+  overflow: hidden;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--paper-edge) 1px, transparent 1px),
+    linear-gradient(90deg, var(--paper-edge) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.hero-inner { position: relative; max-width: 520px; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: var(--blue);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(48px, 5.2vw, 84px);
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+  margin: 0 0 28px;
+  color: var(--ink);
+}
+.title em {
+  font-style: italic;
+  font-weight: 300;
+  color: var(--blue);
+}
+
+.sub {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  max-width: 440px;
+  margin-bottom: 40px;
+}
+
+.meta {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--pencil);
+}
+.meta b { color: var(--ink); font-weight: 500; }
+
+.form-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+}
+
+.form-card { width: 100%; max-width: 380px; }
+
+.form-card h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+
+.form-card .form-sub {
+  font-size: 14px;
+  color: var(--pencil);
+  margin-bottom: 28px;
+}
+
+.field { display: block; margin-bottom: 18px; }
+.field label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--pencil);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.field input, .field textarea, .field select {
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--paper-edge);
+  font-size: 15px;
+  transition: border-color 160ms;
+  border-radius: 0;
+  color: var(--ink);
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+  outline: none;
+  border-bottom-color: var(--blue);
+}
+
+.error {
+  margin: 8px 0 16px;
+  padding: 10px 14px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 6px;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.success {
+  margin: 8px 0 16px;
+  padding: 10px 14px;
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-radius: 6px;
+  color: #15803d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  font-weight: 500;
+  font-size: 14px;
+  border-radius: 999px;
+  transition: all 160ms;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+}
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-primary:hover { background: var(--blue); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.foot {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--paper-edge);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--pencil);
+  line-height: 1.7;
+}
+.foot a { color: var(--blue); text-decoration: none; }
+.foot a:hover { border-bottom: 1px solid currentColor; }
