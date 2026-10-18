@@ -1,0 +1,231 @@
+/**
+ * 模板预览样式.
+ * 视觉规范:
+ *   - A4 = 210mm x 297mm → @ 96 DPI ≈ 794px x 1123px
+ *   - 编辑器右栏约 50% 宽(约 500-720px),需要 transform: scale(0.6~0.8)
+ *   - 预览容器固定宽 794px,父元素决定缩放
+ *   - 行高、字号按 11pt 排版,适合中文阅读
+ */
+.preview {
+  width: 794px;
+  background: #fff;
+  border: 1px solid var(--border, #d4d8de);
+  border-radius: 4px;
+  padding: 56px 64px;
+  min-height: 1123px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  color: var(--ink, #0f172a);
+  font-size: 14px;
+  line-height: 1.6;
+  transform-origin: top left;
+}
+
+.tpl_classic .sheet { /* 默认样式 */ }
+.tpl_modern .sheet { /* 由 .sheet 微调 */ }
+.tpl_minimal .sheet { /* 由 .sheet 微调 */ }
+
+/* ─── header ─── */
+.header {
+  border-bottom: 1.5px solid var(--ink, #0f172a);
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.tpl_classic .header { text-align: center; }
+.tpl_modern .header,
+.tpl_minimal .header { text-align: left; }
+
+.headerMain {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  justify-content: center;
+}
+
+.tpl_modern .headerMain,
+.tpl_minimal .headerMain { justify-content: flex-start; }
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border, #d4d8de);
+}
+
+.name {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.tpl_minimal .name { font-weight: 500; letter-spacing: 0; }
+.tpl_modern .name { color: var(--blue, #1e40af); }
+
+.label {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--muted, #4b5563);
+}
+
+.contact {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted, #4b5563);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tpl_modern .contact,
+.tpl_minimal .contact { justify-content: flex-start; }
+
+.oneLine {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted, #4b5563);
+}
+
+/* ─── block ─── */
+.block {
+  margin-bottom: 16px;
+}
+
+.blockTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border, #d4d8de);
+}
+
+.tpl_modern .blockTitle {
+  color: var(--blue, #1e40af);
+  border-bottom: 0;
+  border-left: 3px solid var(--blue, #1e40af);
+  padding-left: 8px;
+}
+
+.tpl_minimal .blockTitle {
+  border-bottom: 0;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted, #4b5563);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.blockBody {
+  font-size: 13px;
+}
+
+/* ─── period item ─── */
+.periodItem {
+  margin-bottom: 10px;
+}
+
+.periodHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.periodTitle {
+  font-weight: 600;
+}
+
+.periodSubtitle {
+  color: var(--muted, #4b5563);
+  font-weight: 400;
+}
+
+.periodRange {
+  color: var(--muted, #4b5563);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.periodBody {
+  margin-top: 2px;
+  color: var(--ink, #0f172a);
+}
+
+/* ─── simple item ─── */
+.simpleItem {
+  margin-bottom: 8px;
+}
+
+.simpleHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.simpleTitle {
+  font-weight: 600;
+}
+
+.simpleMeta {
+  color: var(--muted, #4b5563);
+  font-size: 12px;
+}
+
+/* ─── skill list ─── */
+.skillList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+}
+
+.skillItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.skillName {
+  font-weight: 500;
+}
+
+.dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border, #d4d8de);
+}
+
+.dotOn {
+  background: var(--blue, #1e40af);
+}
+
+.langLevel {
+  font-size: 12px;
+  color: var(--muted, #4b5563);
+}
+
+/* ─── rich html ─── */
+.rich {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.rich p { margin: 0 0 4px; }
+.rich p:last-child { margin-bottom: 0; }
+.rich ul, .rich ol { padding-left: 20px; margin: 4px 0; }
+.rich a { color: var(--blue, #1e40af); text-decoration: underline; }
+.rich b, .rich strong { font-weight: 600; }
+.rich em, .rich i { font-style: italic; }
