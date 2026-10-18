@@ -1,0 +1,78 @@
+.wrap {
+  border: 1px solid var(--border, #d4d8de);
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, #d4d8de);
+  background: var(--paper, #fafbfc);
+}
+
+.tbBtn,
+.tbBtnActive {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--ink, #0f172a);
+  cursor: pointer;
+  min-width: 28px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tbBtn:hover {
+  background: var(--border, #d4d8de);
+}
+
+.tbBtnActive {
+  background: var(--blue, #1e40af);
+  color: #fff;
+}
+
+.editor {
+  padding: 8px 12px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink, #0f172a);
+}
+
+.editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted, #94a3b8);
+  pointer-events: none;
+}
+
+.editor p {
+  margin: 0 0 6px;
+}
+
+.editor p:last-child {
+  margin-bottom: 0;
+}
+
+.editor ul,
+.editor ol {
+  padding-left: 20px;
+  margin: 4px 0;
+}
+
+.editor a {
+  color: var(--blue, #1e40af);
+  text-decoration: underline;
+}
+
+.skeleton {
+  border: 1px dashed var(--border, #d4d8de);
+  border-radius: 6px;
+  background: #fff;
+}

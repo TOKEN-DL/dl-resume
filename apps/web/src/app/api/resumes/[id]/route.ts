@@ -15,7 +15,8 @@ import {
 const patchSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   template: z.enum(["classic", "modern", "minimal"]).optional(),
-  data: z.string().optional(),
+  // 200KB 上限 — 简历 JSON 通常 < 50KB,这个余量足够;超过意味着滥用
+  data: z.string().max(200_000).optional(),
 });
 
 export async function PATCH(
