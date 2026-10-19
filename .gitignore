@@ -62,6 +62,12 @@ prototype/
 # Next.js
 next-env.d.ts.bak
 
+# PDF 字体(运行时按需获取;CI/clone 时跑 npm run setup:fonts 重新下载)
+apps/web/public/fonts/*.otf
+apps/web/public/fonts/*.ttf
+apps/web/public/fonts/*.woff
+apps/web/public/fonts/*.woff2
+
 # Misc
 *.pid
 *.seed
