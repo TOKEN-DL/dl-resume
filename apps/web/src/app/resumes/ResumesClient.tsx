@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 
@@ -112,6 +112,44 @@ export default function ResumesClient({
     router.refresh();
   }
 
+  // ─── JSON Resume 导入/导出 ───────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  async function importJsonResume(file: File) {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const title = file.name.replace(/\.json$/i, "");
+      const res = await fetch(`/api/resumes/import-json?title=${encodeURIComponent(title)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: text,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`导入失败: ${err.message || res.status}`);
+        return;
+      }
+      const { resume } = await res.json();
+      await refresh();
+      router.push(`/resumes/${resume.id}/edit`);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function exportOne(id: string, title: string) {
+    window.location.href = `/api/resumes/${id}/export-json`;
+  }
+
+  function exportAll() {
+    if (resumes.length === 0) return;
+    resumes.forEach((r, i) => {
+      setTimeout(() => exportOne(r.id, r.title), i * 300);
+    });
+  }
+
   const initial = email.slice(0, 1).toUpperCase();
 
   return (
@@ -167,16 +205,29 @@ export default function ResumesClient({
             </button>
             <button
               className={`${styles.btn} ${styles["btn-ghost"]}`}
-              onClick={() => alert("导入 JSON Resume (issue #11)")}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
             >
-              <span>↓ 导入 JSON Resume</span>
+              <span>↓ {importing ? "导入中…" : "导入 JSON Resume"}</span>
             </button>
             <button
               className={`${styles.btn} ${styles["btn-ghost"]}`}
-              onClick={() => alert("导出全部 (issue #11)")}
+              onClick={exportAll}
+              disabled={resumes.length === 0}
             >
               <span>↑ 导出全部</span>
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importJsonResume(f);
+                e.target.value = "";
+              }}
+            />
           </div>
         </div>
 
@@ -203,6 +254,11 @@ export default function ResumesClient({
                     title="复制"
                     onClick={(e) => { e.stopPropagation(); duplicate(r.id); }}
                   >⎘</button>
+                  <button
+                    className={styles["icon-btn"]}
+                    title="导出 JSON"
+                    onClick={(e) => { e.stopPropagation(); exportOne(r.id, r.title); }}
+                  >↓</button>
                   <button
                     className={`${styles["icon-btn"]} ${styles.danger}`}
                     title="删除"
