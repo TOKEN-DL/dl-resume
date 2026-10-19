@@ -1,0 +1,40 @@
+# docker-compose.yml — 一条命令起 dl-resume.
+#
+# 用法:
+#   cp apps/web/.env.example .env   # 修改 NEXTAUTH_SECRET/APP_SECRET/ADMIN_*
+#   docker compose up -d
+#   docker compose logs -f web       # 查看启动日志(应看到 seed 输出管理员账号)
+#
+# 数据持久化: ./data 目录(数据库 + 字体 + 上传文件).
+# 升级: 修改代码后 docker compose build --no-cache && docker compose up -d.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: dl-resume:latest
+    container_name: dl-resume-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "file:/app/data/dev.db"
+      NEXTAUTH_URL: "http://localhost:3000"
+      # 这些必须从 .env 注入
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:?must set NEXTAUTH_SECRET in .env}"
+      APP_SECRET: "${APP_SECRET:?must set APP_SECRET in .env}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@example.com}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?must set ADMIN_PASSWORD in .env}"
+      ADMIN_NAME: "${ADMIN_NAME:-Admin}"
+      # 首次启动时 seed 管理员,之后改成 false 关闭
+      SEED_ADMIN_ENABLED: "${SEED_ADMIN_ENABLED:-true}"
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3

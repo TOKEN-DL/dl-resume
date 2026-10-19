@@ -1,0 +1,42 @@
+# 应用
+.git
+.gitignore
+.dockerignore
+Dockerfile
+
+# Next.js
+.next/
+out/
+build/
+
+# 依赖(容器内自装)
+node_modules/
+
+# 数据库(容器内自建)
+prisma/dev.db
+prisma/dev.db-journal
+prisma/migrations/dev.db*
+
+# 测试
+coverage/
+.nyc_output/
+
+# 字体(运行时 npm run setup-fonts 下载)
+public/fonts/*.otf
+public/fonts/*.ttf
+public/fonts/*.woff
+public/fonts/*.woff2
+
+# 编辑器配置
+.vscode/
+.idea/
+
+# 临时文件
+.tmp/
+*.log
+*.bak
+
+# docs (镜像中不需要)
+README.md
+scripts/setup-fonts.ts
+scripts/e2e-*.js
