@@ -75,6 +75,27 @@
   font-weight: 500;
 }
 
+.exportBtn {
+  border: 0;
+  background: var(--blue, #1e40af);
+  color: #fff;
+  padding: 5px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.exportBtn:hover:not(:disabled) {
+  background: #1d3a96;
+}
+
+.exportBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .split {
   flex: 1;
   display: grid;

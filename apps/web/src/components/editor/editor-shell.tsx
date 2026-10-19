@@ -79,6 +79,39 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
     return () => ro.disconnect();
   }, []);
 
+  // PDF 导出
+  const [exporting, setExporting] = useState(false);
+  const onExportPdf = async () => {
+    if (exporting) return;
+    // 先把当前本地状态保存到服务端,确保 PDF 取到的是最新内容
+    await draft.flush();
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/resumes/${resumeId}/pdf`, { method: "GET" });
+      if (!res.ok) {
+        alert(`导出失败: HTTP ${res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const disp = res.headers.get("Content-Disposition") ?? "";
+      const m = /filename\*=UTF-8''([^;]+)/.exec(disp);
+      a.href = url;
+      a.download = m ? decodeURIComponent(m[1]) : `${draft.title || "简历"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // 给浏览器一点时间触发,然后 revoke
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e: any) {
+      console.error("[export] failed", e);
+      alert(`导出失败: ${e?.message ?? e}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className={styles.shell}>
       <header className={styles.topbar}>
@@ -107,6 +140,9 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
             </button>
           ))}
         </div>
+        <button type="button" onClick={onExportPdf} disabled={exporting} className={styles.exportBtn}>
+          {exporting ? "导出中…" : "导出 PDF"}
+        </button>
         <SaveIndicator state={draft.saveState} lastSavedAt={draft.lastSavedAt} onFlush={() => draft.flush()} />
       </header>
 
