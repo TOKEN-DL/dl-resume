@@ -168,6 +168,20 @@ export default function ResumesClient({
             <span>{email}</span>
           </span>
           <button
+            onClick={() => router.push("/settings")}
+            style={{
+              padding: "6px 12px",
+              border: "1px solid var(--paper-edge)",
+              borderRadius: 999,
+              background: "transparent",
+              fontSize: 12,
+              cursor: "pointer",
+              color: "var(--ink-soft)",
+            }}
+          >
+            设置
+          </button>
+          <button
             onClick={logout}
             style={{
               padding: "6px 12px",
