@@ -149,9 +149,10 @@ function Header({ data }: { data: ResumeData }) {
           <h1 className={templateStyles.name}>{b.name || "未填写姓名"}</h1>
           {b.label && <div className={templateStyles.label}>{b.label}</div>}
           <div className={templateStyles.contact}>
-            {b.email && <span>✉ {b.email}</span>}
-            {b.phone && <span>☎ {b.phone}</span>}
-            {b.location && <span>⌖ {b.location}</span>}
+            {/* 与 PDF 保持一致:不用符号字形,避免字体缺字形导致显示不一致 */}
+            {b.email && <span>邮箱 {b.email}</span>}
+            {b.phone && <span>电话 {b.phone}</span>}
+            {b.location && <span>所在地 {b.location}</span>}
             {b.gender && <span>· {b.gender === "male" ? "男" : b.gender === "female" ? "女" : "其他"}</span>}
           </div>
           {b.summary && <div className={templateStyles.oneLine}>{b.summary}</div>}
