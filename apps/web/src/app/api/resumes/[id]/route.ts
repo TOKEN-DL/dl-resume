@@ -19,6 +19,18 @@ const patchSchema = z.object({
   data: z.string().max(200_000).optional(),
 });
 
+/**
+ * POST 别名 — navigator.sendBeacon() 只能发 POST,不能发 PATCH。
+ * 页面关闭 / 路由离开时浏览器用它做最后一次保存(F15 验收要求"刷新页面不丢数据")。
+ * 语义与 PATCH 完全一致:按需更新传入的字段。
+ */
+export async function POST(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  return PATCH(req, ctx);
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },

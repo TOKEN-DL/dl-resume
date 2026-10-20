@@ -18,6 +18,8 @@ interface Props {
   initialTitle: string;
   initialTemplate: string;
   initialData: ResumeData;
+  /** 服务端已保存内容的 updatedAt(ms)— 草稿比它旧就不采用 */
+  initialSavedAt?: number;
 }
 
 const TEMPLATES: Array<{ id: "classic" | "modern" | "minimal"; label: string; desc: string }> = [
@@ -26,7 +28,7 @@ const TEMPLATES: Array<{ id: "classic" | "modern" | "minimal"; label: string; de
   { id: "minimal", label: "极简", desc: "单栏 / 灰调 / 间距宽松" },
 ];
 
-export function EditorShell({ resumeId, initialTitle, initialTemplate, initialData }: Props) {
+export function EditorShell({ resumeId, initialTitle, initialTemplate, initialData, initialSavedAt }: Props) {
   const router = useRouter();
 
   const onPersist = async (payload: { data: ResumeData; title?: string; template?: string }) => {
@@ -47,18 +49,14 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
     initialData,
     initialTitle,
     initialTemplate: initialTemplate as any,
+    initialSavedAt,
     onPersist,
     debounceMs: 5000,
   });
 
-  // 离开路由前尝试 flush(浏览器原生 beforeunload 已被 hook 处理)
-  useEffect(() => {
-    const handler = () => {
-      if (draft.saveState === "dirty") draft.flush();
-    };
-    window.addEventListener("pagehide", handler);
-    return () => window.removeEventListener("pagehide", handler);
-  }, [draft]);
+  // 注意:不要在这里额外监听 pagehide/beforeunload 做 flush ——
+  // useLocalDraft 已经处理,且 flush() 是异步的,卸载期间不会等到完成。
+  // 这里重复监听只会引入竞态(基于 saveState 判断,状态可能还没更新)。
 
   // 模板切换预览缩放自适应
   const previewWrapRef = useRef<HTMLDivElement | null>(null);
@@ -112,11 +110,28 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
     }
   };
 
+  // 返回列表页 — 必须 await flush 完成再跳转,
+  // 否则路由切换会取消未完成的 PATCH 请求(用户报告"返回后再进入内容丢失")
+  const [leaving, setLeaving] = useState(false);
+  const goBack = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    try {
+      await draft.flush();
+      router.push("/resumes");
+      router.refresh();
+    } catch {
+      // flush 内部已处理错误并保留 IndexedDB 草稿,照样跳转,
+      // 用户下次打开能从未同步的草稿恢复
+      router.push("/resumes");
+    }
+  };
+
   return (
     <div className={styles.shell}>
       <header className={styles.topbar}>
-        <button type="button" onClick={() => { draft.flush(); router.push("/resumes"); }} className={styles.back}>
-          ← 返回
+        <button type="button" onClick={goBack} disabled={leaving} className={styles.back}>
+          {leaving ? "保存中…" : "← 返回"}
         </button>
         <input
           className={styles.titleInput}

@@ -35,6 +35,7 @@ export default async function EditPage({ params }: Props) {
       initialTitle={resume.title}
       initialTemplate={resume.template}
       initialData={data}
+      initialSavedAt={resume.updatedAt.getTime()}
     />
   );
 }
