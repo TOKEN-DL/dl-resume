@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
+import { assertOwnership } from "@/lib/resume-repo";
 import { parseResumeData } from "@/lib/validation/resume";
 import { exportJsonResume } from "@/lib/jsonresume/mapping";
 
@@ -19,9 +19,13 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const resume = await prisma.resume.findUnique({ where: { id } });
-  if (!resume) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  if (resume.userId !== session.sub) {
+  // 必须走 assertOwnership — 它内部会解密(F18),不要绕过 repo 直接查 prisma
+  let resume;
+  try {
+    resume = await assertOwnership(id, session.sub);
+  } catch (e: any) {
+    const msg = e?.message ?? "";
+    if (msg === "Forbidden") return NextResponse.json({ error: "forbidden" }, { status: 403 });
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 

@@ -77,7 +77,10 @@ import {
   updateResume,
   deleteResume,
   duplicateResume,
+  assertOwnership,
 } from "./resume-repo";
+import { isEncrypted } from "./crypto/resume-cipher";
+import { prisma } from "./prisma";
 
 beforeEach(() => {
   store.clear();
@@ -174,5 +177,79 @@ describe("duplicateResume", () => {
 
   it("throws when source not found", async () => {
     await expect(duplicateResume("nonexistent", "u1")).rejects.toThrow();
+  });
+});
+
+/**
+ * F18 回归测试 — 曾发生过 PDF / JSON 导出 / 编辑器拿到密文导致内容全空。
+ * 根因:这些读取路径绕过 repo 直接调 prisma,漏了 decrypt。
+ * 修复:统一走 assertOwnership / findResumeById(内部解密)。
+ */
+describe("F18 cipher round-trip — 所有读取路径必须返回明文", () => {
+  const payload = JSON.stringify({
+    basics: { name: "张三", email: "zhang@example.com" },
+    work: [{ id: "w1", company: "字节跳动" }],
+  });
+
+  it("createResume 写密文到 DB", async () => {
+    const r = await createResume({ userId: "u1", title: "密文测试", data: payload });
+    const raw = store.get(r.id)!;
+    expect(isEncrypted(raw.data)).toBe(true);
+    expect(raw.data).not.toContain("张三"); // DB 里不能有明文
+  });
+
+  it("findResumeById 返回明文", async () => {
+    const r = await createResume({ userId: "u1", title: "T", data: payload });
+    const got = await findResumeById(r.id);
+    expect(got!.data).toBe(payload);
+    expect(got!.data).toContain("张三");
+  });
+
+  it("assertOwnership 返回明文(编辑器和 PDF 导出都依赖它)", async () => {
+    const r = await createResume({ userId: "u1", title: "T", data: payload });
+    const got = await assertOwnership(r.id, "u1");
+    expect(got.data).toBe(payload);
+    expect(got.data).toContain("字节跳动");
+  });
+
+  it("listResumesByUser 每条都返回明文", async () => {
+    await createResume({ userId: "u1", title: "A", data: payload });
+    await createResume({ userId: "u1", title: "B", data: payload });
+    const list = await listResumesByUser("u1");
+    expect(list).toHaveLength(2);
+    for (const item of list) {
+      expect(item.data).toBe(payload);
+      expect(item.data).toContain("张三");
+    }
+  });
+
+  it("updateResume 写回密文但读出明文", async () => {
+    const r = await createResume({ userId: "u1", title: "T", data: payload });
+    const updated = await updateResume(r.id, { data: payload });
+    expect(updated.data).toBe(payload);
+    expect(isEncrypted(store.get(r.id)!.data)).toBe(true);
+  });
+
+  it("duplicateResume 副本也能读到明文", async () => {
+    const orig = await createResume({ userId: "u1", title: "T", data: payload });
+    const copy = await duplicateResume(orig.id, "u1");
+    expect(copy.data).toBe(payload);
+  });
+
+  it("legacy 明文数据仍可读(向后兼容)", async () => {
+    const r = await createResume({ userId: "u1", title: "T" });
+    // 模拟 F18 之前的旧数据:直接塞明文
+    store.get(r.id)!.data = payload;
+    const got = await assertOwnership(r.id, "u1");
+    expect(got.data).toBe(payload);
+  });
+
+  it("assertOwnership 越权时抛 Forbidden", async () => {
+    const r = await createResume({ userId: "u1", title: "T", data: payload });
+    await expect(assertOwnership(r.id, "u2")).rejects.toThrow("Forbidden");
+  });
+
+  it("assertOwnership 找不到时抛 Resume not found", async () => {
+    await expect(assertOwnership("nonexistent", "u1")).rejects.toThrow("Resume not found");
   });
 });

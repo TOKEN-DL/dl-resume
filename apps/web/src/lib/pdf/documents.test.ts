@@ -81,25 +81,22 @@ async function generate(data: ResumeData, template: "classic" | "modern" | "mini
   return renderToBuffer(ResumeDocument({ data, template }));
 }
 
-/** 中文字符转 UTF-16BE 字节序列(PDF 内嵌字体编码) */
-function utf16be(s: string): Uint8Array {
-  const out: number[] = [];
-  for (let i = 0; i < s.length; i++) {
-    const code = s.charCodeAt(i);
-    out.push((code >> 8) & 0xff, code & 0xff);
+/**
+ * 用 pdfjs 反查 PDF 里的实际文字。
+ * 不能用 UTF-16BE 字节搜索 —— react-pdf 子集化字体走 Identity-H + CMap,
+ * content stream 里是字形 ID,不是 Unicode。要验证中文是否真的渲染出来,
+ * 必须走 pdfjs 的 CMap 解码。
+ */
+async function extractText(buf: Buffer): Promise<string> {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buf) }).promise;
+  let all = "";
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const tc = await page.getTextContent();
+    all += tc.items.map((it: any) => it.str).join("") + "\n";
   }
-  return new Uint8Array(out);
-}
-
-function containsBytes(buf: Buffer, needle: Uint8Array): boolean {
-  for (let i = 0; i <= buf.length - needle.length; i++) {
-    let ok = true;
-    for (let j = 0; j < needle.length; j++) {
-      if (buf[i + j] !== needle[j]) { ok = false; break; }
-    }
-    if (ok) return true;
-  }
-  return false;
+  return all;
 }
 
 describe("ResumeDocument — PDF generation", () => {
@@ -138,11 +135,30 @@ describe("ResumeDocument — PDF generation", () => {
     expect(doc.getTitle()).toBe("张三");
   });
 
-  it("embeds Chinese characters in the content stream", async () => {
+  it("renders Chinese text correctly (verified via pdfjs CMap decode)", async () => {
     const buf = await generate(sampleData, "modern");
-    // PDF 内嵌字体子集使用 UTF-16BE 编码中文字符;查找字节序列 张=0x5F 0x7A
-    const target = utf16be("张");
-    expect(containsBytes(buf, target)).toBe(true);
+    const text = await extractText(buf);
+    // 真实可读的中文 —— 不只是字节存在,而是能反查出来
+    expect(text).toContain("张三");
+    expect(text).toContain("高级前端工程师");
+    expect(text).toContain("字节跳动");
+    expect(text).toContain("清华大学");
+    expect(text).toContain("主导抖音创作者中心重构");
+    expect(text).toContain("阅读");
+  });
+
+  it("renders contact fields with text labels, not missing-glyph boxes", async () => {
+    const buf = await generate(sampleData, "modern");
+    const text = await extractText(buf);
+    // 回归:曾用 emoji ✉📞📍,Noto Sans SC 缺字形 → PDF 里显示成乱码
+    expect(text).toContain("邮箱 zhang@example.com");
+    expect(text).toContain("电话 13800138000");
+    expect(text).toContain("所在地 上海");
+    // 不应残留 emoji 或 .notdef 替换符
+    expect(text).not.toContain("✉");
+    expect(text).not.toContain("📞");
+    expect(text).not.toContain("📍");
+    expect(text).not.toMatch(/[=\uFFF0-\uFFFF]/);
   });
 
   it("empty resume renders without crashing", async () => {
@@ -177,8 +193,9 @@ describe("ResumeDocument — PDF generation", () => {
     };
     const buf = await generate(data, "classic");
     expect(buf.length).toBeGreaterThan(5_000);
-    // 字符可能被 PDF 拆成多个 TJ;逐字断言
-    expect(containsBytes(buf, utf16be("字"))).toBe(true);
-    expect(containsBytes(buf, utf16be("节"))).toBe(true);
+    const text = await extractText(buf);
+    expect(text).toContain("字节跳动");
+    expect(text).toContain("第一项");
+    expect(text).toContain("第二项");
   });
 });

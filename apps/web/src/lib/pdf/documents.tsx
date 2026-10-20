@@ -326,9 +326,10 @@ function Header({ data, variant }: { data: ResumeData; variant: "center" | "left
       <Text style={styles.headerName}>{b.name || "未填写姓名"}</Text>
       {!!b.label && <Text style={styles.headerLabel}>{b.label}</Text>}
       <View style={styles.headerContact}>
-        {b.email && <Text style={styles.headerContactItem}>✉ {b.email}</Text>}
-        {b.phone && <Text style={styles.headerContactItem}>📞 {b.phone}</Text>}
-        {b.location && <Text style={styles.headerContactItem}>📍 {b.location}</Text>}
+        {/* 不用 emoji:Noto Sans SC 无这些字形,PDF 里会变成 .notdef 乱码 */}
+        {b.email && <Text style={styles.headerContactItem}>邮箱 {b.email}</Text>}
+        {b.phone && <Text style={styles.headerContactItem}>电话 {b.phone}</Text>}
+        {b.location && <Text style={styles.headerContactItem}>所在地 {b.location}</Text>}
       </View>
       {!!b.summary && <Text style={styles.headerOneLine}>{b.summary}</Text>}
     </View>
