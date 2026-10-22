@@ -113,6 +113,9 @@ export default async function HomePage() {
             <Link href="/templates" className={styles.btnGhost}>
               逛 82 套模板 →
             </Link>
+            <Link href="/optimize" className={styles.btnGhost}>
+              ✦ 智能体优化简历
+            </Link>
           </div>
           <dl className={styles.stats}>
             {STATS.map((s) => (

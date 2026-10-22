@@ -16,6 +16,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createResume } from "./create-resume";
+import { OptimizeBadge } from "@/components/optimize/optimize-badge";
 import styles from "./site-nav.module.css";
 
 /** 下拉里的「最近编辑」条目 */
@@ -249,6 +250,7 @@ export function SiteNav({ email, isAdmin = false, recent = NO_RESUMES }: SiteNav
       </nav>
 
       <div className={styles.right}>
+        <OptimizeBadge />
         {isAdmin && <span className={styles.adminTag}>ADMIN</span>}
         {signedIn ? (
           <span className={styles.pill}>

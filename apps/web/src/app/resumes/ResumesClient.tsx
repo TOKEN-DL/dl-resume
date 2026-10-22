@@ -207,6 +207,12 @@ export default function ResumesClient({
             </button>
             <button
               className={`${styles.btn} ${styles["btn-ghost"]}`}
+              onClick={() => router.push("/optimize")}
+            >
+              <span>✦ 智能体优化</span>
+            </button>
+            <button
+              className={`${styles.btn} ${styles["btn-ghost"]}`}
               onClick={() => setImportOpen(true)}
             >
               <span>↓ 导入简历</span>
