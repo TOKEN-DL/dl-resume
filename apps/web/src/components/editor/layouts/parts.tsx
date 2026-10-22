@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import type { ResumeData } from "@/lib/validation/resume";
-import type { ThemeTokens } from "@/lib/templates/types";
+import type { LayoutKind, ThemeTokens } from "@/lib/templates/types";
 import { FONT_STACKS } from "@/lib/templates/fonts";
 import styles from "../templates.module.css";
 
@@ -153,9 +153,19 @@ export function SkillList({
 }
 
 /** 姓名 / 联系方式抬头 */
-export function HeaderBlock({ data, theme }: { data: ResumeData; theme: ThemeTokens }) {
+export function HeaderBlock({
+  data,
+  theme,
+  layout,
+}: {
+  data: ResumeData;
+  theme: ThemeTokens;
+  /** 骨架类型 —— 决定抬头是居中还是左对齐 */
+  layout: LayoutKind;
+}) {
   const b = data.basics;
-  const centered = theme.layout === "single-classic";
+  // 单栏经典骨架用居中大标题,其余骨架一律左对齐
+  const centered = layout === "single-classic";
   const avatarCls = styles[`av_${theme.avatar}`];
   return (
     <header

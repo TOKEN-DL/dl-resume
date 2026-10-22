@@ -43,7 +43,14 @@ export const FONT_MANIFEST: FontFile[] = [
   },
   {
     file: "LXGWWenKai-Regular.ttf",
-    url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.520/LXGWWenKai-Regular.ttf",
+    url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.530/LXGWWenKai-Regular.ttf",
+    minBytes: 5_000_000,
+  },
+  {
+    // 霞鹜文楷没有 Bold,官方只发布 Light/Medium/Regular;
+    // 用 Medium 承载 PDF 端的强调字重(真字重,不是合成的假粗体)
+    file: "LXGWWenKai-Medium.ttf",
+    url: "https://github.com/lxgw/LxgwWenKai/releases/download/v1.530/LXGWWenKai-Medium.ttf",
     minBytes: 5_000_000,
   },
 ];

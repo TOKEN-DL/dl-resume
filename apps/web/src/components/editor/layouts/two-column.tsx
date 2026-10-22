@@ -29,7 +29,7 @@ export function TwoColumn({ data, theme }: LayoutProps) {
   return (
     <div className={`${styles.sheet} ${styles.twoCol}`}>
       <div className={styles.twoColHead}>
-        <HeaderBlock data={data} theme={theme} />
+        <HeaderBlock data={data} theme={theme} layout="two-column" />
       </div>
       <div className={styles.twoColGrid}>
         <div className={styles.twoColItem}>

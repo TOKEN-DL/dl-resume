@@ -1,0 +1,106 @@
+/**
+ * /templates 模板库画廊页 —— 页面外壳样式.
+ * 卡片 / 网格 / 筛选条的样式在 components/templates/template-picker.module.css,
+ * 因为编辑器里的「换模板」弹层复用同一套 UI。
+ */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--paper-edge);
+  background: var(--paper);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.brandGlyph {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  border-radius: 50%;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  transition: all 160ms;
+}
+.back:hover { border-color: var(--ink); color: var(--ink); }
+
+.main {
+  flex: 1;
+  padding: 56px 40px 80px;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.head { margin-bottom: 40px; }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(36px, 4vw, 56px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 16px;
+}
+.title em { font-style: italic; color: var(--blue); font-weight: 300; }
+.sub {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink-soft);
+  max-width: 620px;
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .topbar { padding: 16px 24px; }
+  .main { padding: 36px 24px 60px; }
+}
+@media (max-width: 720px) {
+  .main { padding: 28px 16px 48px; }
+  .title { font-size: 32px; }
+}

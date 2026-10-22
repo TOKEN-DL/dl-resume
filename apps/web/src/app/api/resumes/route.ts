@@ -9,10 +9,15 @@ import {
   listResumesByUser,
   createResume,
 } from "@/lib/resume-repo";
+import { isTemplateId } from "@/lib/templates";
+import { repairResumeData, safeStringify } from "@/lib/validation/resume";
 
 const createSchema = z.object({
   title: z.string().trim().min(1).max(120).default("未命名简历"),
-  template: z.enum(["classic", "modern", "minimal"]).default("classic"),
+  // 模板 id 由注册表动态校验(32 套),不再硬编码 z.enum
+  template: z.string().trim().min(1).max(60).default("classic"),
+  // 从模板新建时可预填范文(ResumeData 对象);非法结构会被 repairResumeData 抢救
+  data: z.unknown().optional(),
 });
 
 export async function GET() {
@@ -38,10 +43,23 @@ export async function POST(req: Request) {
     );
   }
 
+  if (!isTemplateId(parsed.data.template)) {
+    return NextResponse.json(
+      { error: `未知模板: ${parsed.data.template}` },
+      { status: 400 },
+    );
+  }
+
+  const data =
+    parsed.data.data === undefined
+      ? undefined
+      : safeStringify(repairResumeData(parsed.data.data));
+
   const r = await createResume({
     userId: session.sub,
     title: parsed.data.title,
     template: parsed.data.template,
+    data,
   });
   return NextResponse.json({ resume: r }, { status: 201 });
 }

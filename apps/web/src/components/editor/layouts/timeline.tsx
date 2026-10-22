@@ -27,7 +27,7 @@ export interface LayoutProps {
 export function Timeline({ data, theme }: LayoutProps) {
   return (
     <div className={`${styles.sheet} ${styles.timelineSheet}`}>
-      <HeaderBlock data={data} theme={theme} />
+      <HeaderBlock data={data} theme={theme} layout="timeline" />
       <SummaryBlock data={data} theme={theme} />
 
       {data.work.length > 0 && (

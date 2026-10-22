@@ -9,7 +9,8 @@ import { encryptResumeData, decryptResumeData } from "./crypto/resume-cipher";
 export interface CreateResumeInput {
   userId: string;
   title: string;
-  template?: "classic" | "modern" | "minimal";
+  /** 模板 id;取值范围由 lib/templates 的注册表约束(API 层已校验) */
+  template?: string;
   data?: string; // 明文 JSON 字符串
 }
 
@@ -27,9 +28,35 @@ type ResumeRow = {
 /** 解密后的 .data 字段,返回给调用方 */
 export type ResumeDecrypted = Omit<ResumeRow, "data"> & { data: string };
 
-function decrypt<T extends ResumeRow | null | undefined>(row: T): T extends ResumeRow ? ResumeDecrypted : T {
-  if (!row) return row as any;
-  return { ...row, data: decryptResumeData(row.data) } as any;
+/**
+ * 重载让 `decrypt(row: ResumeRow)` 在调用点拿到窄化的 ResumeDecrypted,
+ * 而不是和 null/undefined 分支混合的并集 —— 这样下游 listResumesByUser
+ * 这种纯数组返回的函数无需再写 .filter 收紧类型。
+ */
+function decrypt(row: ResumeRow): ResumeDecrypted;
+function decrypt(row: ResumeRow | null | undefined): ResumeDecrypted | null | undefined;
+function decrypt(row: ResumeRow | null | undefined): ResumeDecrypted | null | undefined {
+  if (!row) return row;
+  return { ...row, data: decryptResumeData(row.data) };
+}
+
+/**
+ * 从 unknown 抓错误消息。
+ * assertOwnership / Prisma / 我们自己的 throw 都可能冒上来,行为要稳:
+ *  - 真 Error 实例 → 直接 .message
+ *  - 普通对象(被当成错误 throw 的 `{ message: "Forbidden" }`)→ 取 .message
+ *  - 字符串 throw → 整串
+ *  - 其他 → 空串(调用方就会走 404 分支,行为不变)
+ *
+ * 不替换成 `e instanceof Error ? e.message : ""` —— 上层依赖 "Forbidden"
+ * 精确匹配生成 403,丢掉非 Error 分支会让所有权限错误退化成 404,接口语义悄悄坏掉。
+ */
+export function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object" && "message" in e) {
+    return String((e as { message: unknown }).message);
+  }
+  return typeof e === "string" ? e : "";
 }
 
 export async function createResume(input: CreateResumeInput) {

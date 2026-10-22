@@ -6,13 +6,14 @@ import { listFontFiles, getFontFamily } from "./font";
 const FONT_DIR = path.join(process.cwd(), "public", "fonts");
 
 describe("font pipeline", () => {
-  it("PDF 端需要的 5 个字体文件都已就位", () => {
+  it("PDF 端需要的 6 个字体文件都已就位", () => {
     const required = [
       "NotoSansSC-Regular.otf",
       "NotoSansSC-Bold.otf",
       "NotoSerifSC-Regular.otf",
       "NotoSerifSC-Bold.otf",
       "LXGWWenKai-Regular.ttf",
+      "LXGWWenKai-Medium.ttf",
     ];
     for (const f of required) {
       expect(existsSync(path.join(FONT_DIR, f)), `缺少字体 ${f}`).toBe(true);
@@ -26,6 +27,7 @@ describe("font pipeline", () => {
     expect(files).toContain("NotoSerifSC-Regular.otf");
     expect(files).toContain("NotoSerifSC-Bold.otf");
     expect(files).toContain("LXGWWenKai-Regular.ttf");
+    expect(files).toContain("LXGWWenKai-Medium.ttf");
   });
 
   it("字体族名按 key 映射到 react-pdf 的 family", () => {

@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { getTemplate } from "@/lib/templates";
 import styles from "./page.module.css";
+
+// 导入面板连带 markdown / pdf / docx 解析器有好几 MB,
+// 必须等用户真的点了"导入简历"再去下载,否则列表页首屏会被拖垮。
+const ImportResumeModal = dynamic(
+  () => import("@/components/import/import-resume").then((m) => m.ImportResumeModal),
+  { ssr: false, loading: () => <div className={styles.modal} /> },
+);
 
 interface Resume {
   id: string;
@@ -12,11 +21,11 @@ interface Resume {
   createdAt: string;
 }
 
-const TPL_LABEL: Record<string, string> = {
-  classic: "经典",
-  modern: "双栏",
-  minimal: "极简",
-};
+/** 模板名从注册表派生;未知 id 兜底显示原始 id,便于排查脏数据 */
+function templateLabel(id: string): string {
+  const t = getTemplate(id);
+  return t.id === id ? t.name : id;
+}
 
 function formatTime(ts: string) {
   const diff = Date.now() - new Date(ts).getTime();
@@ -41,6 +50,7 @@ export default function ResumesClient({
   const [newName, setNewName] = useState("");
   const [deleting, setDeleting] = useState<Resume | null>(null);
   const [busy, setBusy] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   async function refresh() {
     const r = await fetch("/api/resumes", { cache: "no-store" });
@@ -139,6 +149,17 @@ export default function ResumesClient({
     }
   }
 
+  // ─── 多格式导入(PDF / Word / Markdown) ──────────────────────────
+  async function onImported(resumeId: string, missingFields: string[]) {
+    setImportOpen(false);
+    await refresh();
+    // 缺失字段通过 query 带到编辑器,由编辑页顶部提示补齐
+    const qs = missingFields.length
+      ? `?imported=1&missing=${encodeURIComponent(missingFields.join(","))}`
+      : "?imported=1";
+    router.push(`/resumes/${resumeId}/edit${qs}`);
+  }
+
   function exportOne(id: string, title: string) {
     window.location.href = `/api/resumes/${id}/export-json`;
   }
@@ -219,6 +240,18 @@ export default function ResumesClient({
             </button>
             <button
               className={`${styles.btn} ${styles["btn-ghost"]}`}
+              onClick={() => router.push("/templates")}
+            >
+              <span>▦ 从模板新建</span>
+            </button>
+            <button
+              className={`${styles.btn} ${styles["btn-ghost"]}`}
+              onClick={() => setImportOpen(true)}
+            >
+              <span>↓ 导入简历</span>
+            </button>
+            <button
+              className={`${styles.btn} ${styles["btn-ghost"]}`}
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
             >
@@ -247,7 +280,7 @@ export default function ResumesClient({
 
         {resumes.length === 0 ? (
           <div className={styles.empty}>
-            还没有简历。点击上方"新建简历"开始你的第一份。
+            还没有简历。点击上方「新建简历」开始你的第一份。
           </div>
         ) : (
           <div className={styles.grid}>
@@ -298,7 +331,7 @@ export default function ResumesClient({
                   </div>
                   <span className={styles.badge}>
                     <span className={styles.dot}></span>
-                    <span>{TPL_LABEL[r.template] ?? r.template.toUpperCase()}</span>
+                    <span>{templateLabel(r.template)}</span>
                   </span>
                 </div>
               </article>
@@ -314,6 +347,13 @@ export default function ResumesClient({
           </div>
         )}
       </section>
+
+      {importOpen && (
+        <ImportResumeModal
+          onClose={() => setImportOpen(false)}
+          onCreated={onImported}
+        />
+      )}
 
       {renaming && (
         <div className={styles.modal} onClick={() => setRenaming(null)}>

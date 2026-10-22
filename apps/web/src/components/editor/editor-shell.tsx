@@ -7,8 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocalDraft } from "./use-local-draft";
 import { ResumeForm } from "./sections";
-import { TemplatePreview } from "./templates";
+import { TemplateRenderer } from "./template-renderer";
 import { SaveIndicator } from "./save-indicator";
+import { TemplatePicker } from "@/components/templates/template-picker";
+import { getTemplate } from "@/lib/templates";
 import { safeStringify } from "@/lib/validation/resume";
 import type { ResumeData } from "@/lib/validation/resume";
 import styles from "./editor-shell.module.css";
@@ -20,16 +22,27 @@ interface Props {
   initialData: ResumeData;
   /** 服务端已保存内容的 updatedAt(ms)— 草稿比它旧就不采用 */
   initialSavedAt?: number;
+  /** F20: 是否刚从导入流程跳转过来 */
+  imported?: boolean;
+  /** 导入时没能识别出来的必填字段 */
+  missingFields?: string[];
 }
 
-const TEMPLATES: Array<{ id: "classic" | "modern" | "minimal"; label: string; desc: string }> = [
-  { id: "classic", label: "经典", desc: "单栏 / 衬线字体 / 居中标题" },
-  { id: "modern", label: "现代", desc: "单栏 / 蓝调 / 左侧色块" },
-  { id: "minimal", label: "极简", desc: "单栏 / 灰调 / 间距宽松" },
-];
+type TemplateId = string;
 
-export function EditorShell({ resumeId, initialTitle, initialTemplate, initialData, initialSavedAt }: Props) {
+export function EditorShell({
+  resumeId,
+  initialTitle,
+  initialTemplate,
+  initialData,
+  initialSavedAt,
+  imported = false,
+  missingFields = [],
+}: Props) {
   const router = useRouter();
+  const [showImportTip, setShowImportTip] = useState(imported);
+  /** 模板选择器弹层 */
+  const [tplPickerOpen, setTplPickerOpen] = useState(false);
 
   const onPersist = async (payload: { data: ResumeData; title?: string; template?: string }) => {
     const res = await fetch(`/api/resumes/${resumeId}`, {
@@ -48,7 +61,7 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
     resumeId,
     initialData,
     initialTitle,
-    initialTemplate: initialTemplate as any,
+    initialTemplate: getTemplate(initialTemplate).id,
     initialSavedAt,
     onPersist,
     debounceMs: 5000,
@@ -102,9 +115,10 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
       a.remove();
       // 给浏览器一点时间触发,然后 revoke
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("[export] failed", e);
-      alert(`导出失败: ${e?.message ?? e}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(`导出失败: ${msg}`);
     } finally {
       setExporting(false);
     }
@@ -140,26 +154,40 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
           placeholder="简历标题"
           aria-label="简历标题"
         />
-        <div className={styles.tplPicker} role="radiogroup" aria-label="模板">
-          {TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="radio"
-              aria-checked={draft.template === t.id}
-              onClick={() => draft.setTemplate(t.id)}
-              className={draft.template === t.id ? styles.tplBtnActive : styles.tplBtn}
-              title={t.desc}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => setTplPickerOpen(true)}
+          className={styles.tplBtn}
+          title={getTemplate(draft.template).summary}
+        >
+          ▦ {getTemplate(draft.template).name}
+        </button>
         <button type="button" onClick={onExportPdf} disabled={exporting} className={styles.exportBtn}>
           {exporting ? "导出中…" : "导出 PDF"}
         </button>
         <SaveIndicator state={draft.saveState} lastSavedAt={draft.lastSavedAt} onFlush={() => draft.flush()} />
       </header>
+
+      {showImportTip && (
+        <div className={styles.importTip} role="status">
+          <div className={styles.importTipBody}>
+            <strong>导入完成</strong>
+            <span>
+              {missingFields.length > 0
+                ? `没能自动识别出:${missingFields.join("、")},请在左侧补齐后保存。`
+                : "识别到的字段已经填好,核对一遍就可以直接导出。"}
+            </span>
+          </div>
+          <button
+            type="button"
+            className={styles.importTipClose}
+            onClick={() => setShowImportTip(false)}
+            aria-label="关闭提示"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className={styles.split}>
         <section className={styles.left}>
@@ -170,10 +198,21 @@ export function EditorShell({ resumeId, initialTitle, initialTemplate, initialDa
             className={styles.previewScale}
             style={{ transform: `scale(${scale})`, height: 1123 * scale }}
           >
-            <TemplatePreview data={draft.data} template={draft.template as any} />
+            <TemplateRenderer def={getTemplate(draft.template)} data={draft.data} />
           </div>
         </section>
       </div>
+
+      {tplPickerOpen && (
+        <TemplatePicker
+          mode="switch"
+          onSelect={(id) => {
+            draft.setTemplate(id);
+            setTplPickerOpen(false);
+          }}
+          onClose={() => setTplPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

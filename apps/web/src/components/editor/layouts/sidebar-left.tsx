@@ -27,7 +27,7 @@ export function SidebarLeft({ data, theme }: LayoutProps) {
   return (
     <div className={`${styles.sheet} ${styles.sideLayout}`}>
       <aside className={styles.side}>
-        <HeaderBlock data={data} theme={theme} />
+        <HeaderBlock data={data} theme={theme} layout="sidebar-left" />
         <div className={styles.sideSection}>
           <h2 className={styles.sideTitle}>联系方式</h2>
           <ContactList data={data} />

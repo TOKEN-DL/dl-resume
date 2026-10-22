@@ -34,7 +34,7 @@ export function SidebarRight({ data, theme }: LayoutProps) {
         <AwardsBlock data={data} theme={theme} />
       </main>
       <aside className={styles.side}>
-        <HeaderBlock data={data} theme={theme} />
+        <HeaderBlock data={data} theme={theme} layout="sidebar-right" />
         <div className={styles.sideSection}>
           <h2 className={styles.sideTitle}>联系方式</h2>
           <ContactList data={data} />

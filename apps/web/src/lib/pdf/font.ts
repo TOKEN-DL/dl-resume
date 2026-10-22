@@ -36,10 +36,13 @@ const FAMILIES: Record<
     ],
   },
   kai: {
-    // 霞鹜文楷没有独立 Bold 字重,700 复用 Regular 文件。
-    // 若 react-pdf 不合成粗体,楷体模板的标题层级改用色带 + 字号表达。
+    // 霞鹜文楷官方没有 Bold(只有 Light/Medium/Regular),
+    // 用 Medium 承载 PDF 端的强调字重 —— 真字重,不是 fontkit 合成出来的假粗体。
     family: "LXGW WenKai",
-    files: [{ file: "LXGWWenKai-Regular.ttf", weight: 700 }],
+    files: [
+      { file: "LXGWWenKai-Regular.ttf", weight: 400 },
+      { file: "LXGWWenKai-Medium.ttf", weight: 700 },
+    ],
   },
 };
 

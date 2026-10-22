@@ -579,3 +579,394 @@
   text-transform: uppercase;
   letter-spacing: 2px;
 }
+
+/* ─── 其余模板的专属装饰层 ─────────────────────────────────────── */
+/* 每套至少在「字号节奏 / 标题形态 / 装饰细节」里与其它 31 套拉开一档 */
+
+/* 纯白极简 —— 姓名拉开字距,分节更疏,近乎无装饰 */
+[data-tpl="pure-minimal"] .name {
+  letter-spacing: 6px;
+  font-weight: 600;
+}
+
+[data-tpl="pure-minimal"] .block {
+  margin-bottom: 22px;
+}
+
+[data-tpl="pure-minimal"] .blockTitle {
+  letter-spacing: 3px;
+}
+
+/* 黑白线框 —— 线框更淡,姓名下划线加粗 */
+[data-tpl="mono-line"] .blockTitle {
+  border-bottom-width: 1px;
+  border-bottom-color: var(--border);
+  padding-bottom: 5px;
+}
+
+[data-tpl="mono-line"] .name {
+  letter-spacing: 3px;
+  border-bottom-width: 3px;
+}
+
+/* 墨色留白 —— 宋体大标题 + 短横线,分节最疏 */
+[data-tpl="ink-brush"] .name {
+  font-size: 30px;
+  letter-spacing: 3px;
+}
+
+[data-tpl="ink-brush"] .blockTitle {
+  display: inline-block;
+  border-bottom-width: 2px;
+  padding-bottom: 3px;
+}
+
+[data-tpl="ink-brush"] .block {
+  margin-bottom: 24px;
+}
+
+/* 灰度网格 —— 竖条加宽,双栏间距收紧 */
+[data-tpl="mono-grid"] .blockTitle {
+  border-left-width: 4px;
+  padding-left: 10px;
+}
+
+[data-tpl="mono-grid"] .twoColGrid {
+  gap: 0 28px;
+}
+
+[data-tpl="mono-grid"] .skillName {
+  background: var(--accent-soft);
+  padding: 1px 8px;
+  border-radius: 3px;
+}
+
+/* 蓝调商务 —— 双栏之间加一道竖线,标题下划线加蓝 */
+[data-tpl="blue-corporate"] .twoColItem:first-child {
+  padding-right: 24px;
+  border-right: 1px solid var(--border);
+}
+
+[data-tpl="blue-corporate"] .blockTitle {
+  border-bottom-width: 2px;
+  border-bottom-color: var(--accent);
+}
+
+/* 深蓝典雅 —— 侧栏标题用衬线,侧栏内加细分隔 */
+[data-tpl="navy-elegant"] .sideTitle {
+  font-family: var(--font);
+  font-size: 14px;
+  letter-spacing: 2px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+[data-tpl="navy-elegant"] .side .contactItem {
+  border-bottom: 1px dotted var(--border);
+  padding-bottom: 4px;
+}
+
+/* 香槟金 —— 姓名与标题统一金色细线 */
+[data-tpl="gold-luxury"] .name {
+  letter-spacing: 4px;
+}
+
+[data-tpl="gold-luxury"] .blockTitle {
+  border-bottom-width: 2px;
+  border-bottom-color: var(--accent);
+  display: inline-block;
+}
+
+[data-tpl="gold-luxury"] .header {
+  border-bottom-color: var(--accent);
+}
+
+/* 灰度横线 —— 下划线细,节奏偏紧 */
+[data-tpl="gray-underline"] .blockTitle {
+  border-bottom-width: 1.5px;
+  display: inline-block;
+  padding-bottom: 2px;
+}
+
+[data-tpl="gray-underline"] .block {
+  margin-bottom: 14px;
+}
+
+/* 科技渐变 —— 标题色块带圆角,姓名加青色底纹 */
+[data-tpl="tech-gradient"] .blockTitle {
+  border-radius: 999px;
+  padding: 3px 14px;
+}
+
+[data-tpl="tech-gradient"] .name {
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+
+/* 深空科技 —— 深底侧栏,姓名青色高亮,技能条发亮 */
+[data-tpl="dark-tech"] .side {
+  background: #0b1220;
+}
+
+[data-tpl="dark-tech"] .name {
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+
+[data-tpl="dark-tech"] .sideTitle {
+  color: var(--accent);
+}
+
+[data-tpl="dark-tech"] .barOn {
+  box-shadow: 0 0 6px var(--accent);
+}
+
+/* 代码极客 —— 序号更醒目,等宽数字 */
+[data-tpl="code-style"] .blockTitle::before {
+  opacity: 1;
+  font-weight: 700;
+}
+
+[data-tpl="code-style"] .blockTitle {
+  font-family: ui-monospace, "SFMono-Regular", "Noto Sans SC", monospace;
+}
+
+[data-tpl="code-style"] .entryRange {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 薄荷清新 —— 标题前加圆点,姓名薄荷色 */
+[data-tpl="fresh-mint"] .blockTitle::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 7px;
+  vertical-align: 2px;
+}
+
+[data-tpl="fresh-mint"] .name {
+  color: var(--accent);
+}
+
+/* 樱粉 —— 侧栏粉底,标题色块更饱满 */
+[data-tpl="sakura"] .side {
+  background: #fdf2f8;
+}
+
+[data-tpl="sakura"] .blockTitle {
+  border-radius: 2px;
+  padding: 4px 12px;
+}
+
+[data-tpl="sakura"] .name {
+  letter-spacing: 2px;
+}
+
+/* 米色治愈 —— 楷体、圆角、间距最松 */
+[data-tpl="cream"] .name {
+  font-size: 27px;
+  letter-spacing: 3px;
+}
+
+[data-tpl="cream"] .block {
+  margin-bottom: 20px;
+}
+
+[data-tpl="cream"] .blockTitle {
+  letter-spacing: 3px;
+}
+
+/* 天青 —— 楷体双栏,标题衬线加宽 */
+[data-tpl="sky-blue"] .blockTitle {
+  font-size: 16px;
+  letter-spacing: 3px;
+}
+
+[data-tpl="sky-blue"] .twoColGrid {
+  gap: 0 30px;
+}
+
+/* 雅致宋体 —— 姓名超大居中,衬线标题 */
+[data-tpl="elegant-serif"] .name {
+  font-size: 32px;
+  letter-spacing: 5px;
+}
+
+[data-tpl="elegant-serif"] .blockTitle {
+  font-size: 17px;
+  letter-spacing: 4px;
+}
+
+/* 香槟极简 —— 名字字距拉开,零边框 */
+[data-tpl="champagne"] .name {
+  letter-spacing: 5px;
+  font-weight: 500;
+}
+
+[data-tpl="champagne"] .header {
+  border-bottom-color: var(--border);
+}
+
+/* 墨黑鎏金 —— 右侧金色细线,姓名衬线大写感 */
+[data-tpl="luxury-dark"] .side {
+  background: #0a0a0a;
+  border-left: 1px solid var(--accent);
+}
+
+[data-tpl="luxury-dark"] .name {
+  color: var(--accent);
+  letter-spacing: 3px;
+}
+
+[data-tpl="luxury-dark"] .sideTitle {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
+  padding-bottom: 4px;
+}
+
+/* 珍珠白 —— 楷体下划线浅而细,分节舒展 */
+[data-tpl="pearl"] .name {
+  letter-spacing: 3px;
+  font-weight: 500;
+}
+
+[data-tpl="pearl"] .blockTitle {
+  display: inline-block;
+  border-bottom-width: 1px;
+  border-bottom-color: var(--border);
+  padding-bottom: 3px;
+}
+
+/* 撞色张扬 —— 大色块 + 撞色左边条 */
+[data-tpl="creative-bold"] .blockTitle {
+  padding: 5px 16px;
+  font-size: 16px;
+  letter-spacing: 2px;
+}
+
+[data-tpl="creative-bold"] .entryTitle {
+  color: var(--accent);
+}
+
+/* 设计师作品集 —— 卡片圆角加大,紫色顶条更厚 */
+[data-tpl="designer"] .card {
+  border-top-width: 4px;
+  border-radius: 10px;
+}
+
+[data-tpl="designer"] .cardTitle {
+  letter-spacing: 1px;
+}
+
+/* 时间轴叙事 —— 节点更大,竖线更粗 */
+[data-tpl="timeline-style"] .timelineNode {
+  width: 11px;
+  height: 11px;
+  left: -19px;
+}
+
+[data-tpl="timeline-style"] .timeline::before {
+  width: 2px;
+  left: 4.5px;
+}
+
+[data-tpl="timeline-style"] .timeline {
+  padding-left: 20px;
+}
+
+/* 杂志编排 —— 超大衬线姓名,卡片弱化边框 */
+[data-tpl="magazine"] .name {
+  font-size: 34px;
+  letter-spacing: 6px;
+  line-height: 1.25;
+}
+
+[data-tpl="magazine"] .card {
+  border-top-width: 1px;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-tpl="magazine"] .blockTitle {
+  font-size: 17px;
+  letter-spacing: 3px;
+}
+
+/* 紧凑一页 —— 字号更小、行更紧、章节几乎无间隙 */
+[data-tpl="compact"] .block {
+  margin-bottom: 9px;
+}
+
+[data-tpl="compact"] .blockTitle {
+  font-size: 13.5px;
+  margin-bottom: 5px;
+}
+
+[data-tpl="compact"] .entry {
+  margin-bottom: 6px;
+}
+
+[data-tpl="compact"] .rich {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* 双栏专业 —— 竖条 + 栏间竖线 */
+[data-tpl="two-col-pro"] .blockTitle {
+  border-left-width: 4px;
+  padding-left: 9px;
+}
+
+[data-tpl="two-col-pro"] .twoColItem:first-child {
+  padding-right: 22px;
+  border-right: 1px solid var(--border);
+}
+
+/* 图示信息 —— 序号前置,侧栏节点式标题 */
+[data-tpl="infographic"] .blockTitle::before {
+  opacity: 1;
+  font-weight: 700;
+}
+
+[data-tpl="infographic"] .sideTitle {
+  letter-spacing: 2px;
+  border-bottom: 1px solid var(--accent);
+  padding-bottom: 3px;
+}
+
+/* 学术蓝 —— 居中衬线姓名 + 蓝色下划线标题 */
+[data-tpl="academic"] .name {
+  letter-spacing: 4px;
+}
+
+[data-tpl="academic"] .blockTitle {
+  display: inline-block;
+  border-bottom-width: 2px;
+  border-bottom-color: var(--accent);
+  padding-bottom: 2px;
+}
+
+/* 论文感 —— 论文式窄行距,标题细线 */
+[data-tpl="paper-serif"] .blockTitle {
+  border-bottom-width: 1px;
+  letter-spacing: 1px;
+}
+
+[data-tpl="paper-serif"] .rich {
+  line-height: 1.75;
+}
+
+/* 实验报告 —— 竖条 + 编号感 + 紧凑双栏 */
+[data-tpl="lab-report"] .blockTitle {
+  border-left-width: 4px;
+  padding-left: 9px;
+  letter-spacing: 1px;
+}
+
+[data-tpl="lab-report"] .twoColGrid {
+  gap: 0 26px;
+}
+

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { TemplateRenderer } from "./template-renderer";
 import { TEMPLATES, getTemplate } from "@/lib/templates";
 import { SAMPLE_PROFESSIONAL } from "@/lib/templates/samples";
+import { EMPTY_RESUME_DATA } from "@/lib/validation/resume";
 
 describe("TemplateRenderer", () => {
   it("全部 32 套模板都能渲染出范文里的姓名", () => {
@@ -33,30 +34,9 @@ describe("TemplateRenderer", () => {
   });
 
   it("空数据不报错,并给出占位姓名", () => {
-    const empty = {
-      basics: {
-        name: "",
-        label: "",
-        email: "",
-        phone: "",
-        gender: "",
-        location: "",
-        avatar: "",
-        summary: "",
-      },
-      summary: "",
-      education: [],
-      work: [],
-      projects: [],
-      skills: [],
-      languages: [],
-      awards: [],
-      certificates: [],
-      interests: "",
-    };
     for (const def of TEMPLATES) {
       const html = renderToStaticMarkup(
-        <TemplateRenderer def={def} data={empty} />,
+        <TemplateRenderer def={def} data={EMPTY_RESUME_DATA} />,
       );
       expect(html, def.id).toContain("未填写姓名");
     }

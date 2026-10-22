@@ -1325,9 +1325,9 @@ git commit -m "test: 模板库全量回归与 32 套 PDF 导出验证"
 
 | 骨架 | 模板 id |
 |---|---|
-| 单栏经典 | pure-minimal, ink-brush, classic, gold-luxury, elegant-serif, pearl, academic, paper-serif |
-| 单栏现代 | mono-line, blue-corporate, gray-underline, modern, tech-gradient, fresh-mint, champagne, minimal, compact |
-| 双栏均衡 | mono-grid, code-style, sky-blue, creative-bold, two-col-pro, lab-report |
+| 单栏经典 | pure-minimal, classic, gold-luxury, elegant-serif, cream, pearl, academic, paper-serif |
+| 单栏现代 | mono-line, ink-brush, gray-underline, modern, tech-gradient, fresh-mint, champagne, minimal, compact |
+| 双栏均衡 | mono-grid, blue-corporate, code-style, sky-blue, creative-bold, two-col-pro, lab-report |
 | 左侧栏 | navy-elegant, dark-tech, sakura, infographic |
 | 右侧栏 | luxury-dark |
 | 时间轴 | timeline-style |

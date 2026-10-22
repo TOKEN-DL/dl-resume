@@ -1,5 +1,23 @@
 "use client";
 
+/**
+ * 模板预览用的中文字体。
+ *
+ * 三族都是分片 + unicode-range 的 webfont,浏览器只下载真正用到字形的分片,
+ * 不会因为 32 套模板就拖进几十 MB 字体。
+ *   Noto Sans SC  — 黑体(通用)
+ *   Noto Serif SC — 宋体(正式 / 文艺)
+ *   LXGW WenKai  — 楷体(清新 / 手写感)
+ *
+ * PDF 端用的是同一批字体的 OTF/TTF,见 src/lib/pdf/font.ts。
+ */
+import "@fontsource/noto-sans-sc/400.css";
+import "@fontsource/noto-sans-sc/700.css";
+import "@fontsource/noto-serif-sc/400.css";
+import "@fontsource/noto-serif-sc/700.css";
+import "lxgw-wenkai-webfont/lxgwwenkai-regular.css";
+import "lxgw-wenkai-webfont/lxgwwenkai-bold.css";
+
 import type { ResumeData } from "@/lib/validation/resume";
 import type { TemplateDef } from "@/lib/templates/types";
 import { toCssVars } from "./layouts/parts";

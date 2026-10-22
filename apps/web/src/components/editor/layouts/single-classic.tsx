@@ -28,7 +28,7 @@ export interface LayoutProps {
 export function SingleClassic({ data, theme }: LayoutProps) {
   return (
     <div className={`${styles.sheet} ${styles.singleClassic}`}>
-      <HeaderBlock data={data} theme={theme} />
+      <HeaderBlock data={data} theme={theme} layout="single-classic" />
       <SummaryBlock data={data} theme={theme} />
       <WorkBlock data={data} theme={theme} />
       <ProjectsBlock data={data} theme={theme} />

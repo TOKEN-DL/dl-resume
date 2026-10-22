@@ -27,7 +27,7 @@ export interface LayoutProps {
 export function CardGrid({ data, theme }: LayoutProps) {
   return (
     <div className={`${styles.sheet} ${styles.cardSheet}`}>
-      <HeaderBlock data={data} theme={theme} />
+      <HeaderBlock data={data} theme={theme} layout="card-grid" />
       <SummaryBlock data={data} theme={theme} />
       <WorkBlock data={data} theme={theme} />
 
