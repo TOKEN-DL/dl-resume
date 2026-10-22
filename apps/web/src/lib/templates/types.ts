@@ -53,16 +53,34 @@ export type HeadingStyle =
   | "plain" // 无框弱化
   | "underline" // 标题下划线
   | "index" // 序号式
-  | "serif"; // 衬线大字
+  | "serif" // 衬线大字
+  | "bracket" // 【标题】方括号
+  | "solid" // 墨色实心块
+  | "outline"; // 描边框标题
 
 /** 技能展示形态 */
 export type SkillStyle = "dots" | "bars" | "tags" | "plain";
 
 /** 头像形状 */
-export type AvatarStyle = "circle" | "square" | "rounded" | "none";
+export type AvatarStyle = "circle" | "square" | "rounded" | "none" | "ring";
 
 /** 姓名展示样式 */
-export type NameStyle = "plain" | "underline" | "band" | "big";
+export type NameStyle = "plain" | "underline" | "band" | "big" | "frame" | "bracket";
+
+/**
+ * 抬头形态 —— 姓名 + 联系方式的排布方式。
+ *
+ * 这是单栏骨架之间最主要的区分维度:同样的骨架,
+ * inline / center / stack / boxed / band 能呈现出完全不同的气质。
+ */
+export type HeaderStyle =
+  | "auto" // 由骨架决定(单栏经典居中,其余左对齐)—— 存量模板的默认
+  | "inline" // 头像与姓名左右并列
+  | "center" // 整体居中
+  | "stack" // 头像在上、姓名在下,纵向堆叠
+  | "boxed" // 抬头整体加描边框
+  | "band"; // 抬头铺满主色带
+
 
 export interface ThemeTokens {
   /** 主色 */
@@ -89,6 +107,8 @@ export interface ThemeTokens {
   skill: SkillStyle;
   avatar: AvatarStyle;
   nameStyle: NameStyle;
+  /** 抬头形态 */
+  headerStyle: HeaderStyle;
 }
 
 export interface TemplateDef {

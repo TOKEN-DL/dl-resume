@@ -16,7 +16,7 @@ vi.mock("next/navigation", () => ({
 describe("GalleryClient", () => {
   it("渲染出全部 32 套模板的名字", () => {
     const html = renderToStaticMarkup(<GalleryClient />);
-    expect(TEMPLATES.length).toBe(32);
+    expect(TEMPLATES.length).toBeGreaterThanOrEqual(80);
     for (const t of TEMPLATES) {
       expect(html, t.id).toContain(t.name);
     }

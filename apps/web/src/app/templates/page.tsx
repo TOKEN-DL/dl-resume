@@ -5,6 +5,7 @@
  */
 import Link from "next/link";
 import { GalleryClient } from "./gallery-client";
+import { TEMPLATES } from "@/lib/templates";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic"; // 模板库每次都取最新注册表
@@ -31,7 +32,7 @@ export default function TemplatesPage() {
             开始你的简历。
           </h1>
           <p className={styles.sub}>
-            32 套版式,每套都用真实范文渲染。按风格、场景、岗位挑,
+            {TEMPLATES.length} 套版式,每套都用真实范文渲染。按风格、场景、岗位挑,
             点「使用此模板」直接生成一份可编辑的简历。
           </p>
         </div>

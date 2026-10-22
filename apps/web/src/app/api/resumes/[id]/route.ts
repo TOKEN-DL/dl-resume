@@ -15,7 +15,7 @@ import { isTemplateId } from "@/lib/templates";
 
 const patchSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
-  // 模板 id 由注册表动态校验(32 套),不再硬编码 z.enum —— 见下方 isTemplateId 检查
+  // 模板 id 由注册表动态校验,不再硬编码 z.enum —— 见下方 isTemplateId 检查
   template: z.string().trim().min(1).max(60).optional(),
   // 200KB 上限 — 简历 JSON 通常 < 50KB,这个余量足够;超过意味着滥用
   data: z.string().max(200_000).optional(),

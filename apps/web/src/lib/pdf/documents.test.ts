@@ -7,7 +7,7 @@
  *  - 文件大小合理
  *  - 标题 metadata 反映 resume.basics.name
  *  - 中文字符能落到 content stream 中(必须走 pdfjs 的 CMap 解码)
- *  - 32 套模板全部能生成可解析的 PDF
+ *  - 全部模板都能生成可解析的 PDF
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { PDFDocument } from "pdf-lib";
@@ -221,8 +221,8 @@ describe("ResumeDocument — PDF generation", () => {
     expect(doc.getPages().length).toBeGreaterThanOrEqual(1);
   });
 
-  it("全部 32 套模板都能生成可解析的 PDF", async () => {
-    expect(TEMPLATES.length).toBe(32);
+  it("全部模板都能生成可解析的 PDF", async () => {
+    expect(TEMPLATES.length).toBeGreaterThanOrEqual(80);
     for (const def of TEMPLATES) {
       const buf = await generate(SAMPLE_PROFESSIONAL, def.id);
       expect(buf.length, def.id).toBeGreaterThan(1000);

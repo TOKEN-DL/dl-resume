@@ -1,5 +1,5 @@
 /**
- * PDF 文档入口 —— 32 套模板 × 7 种布局骨架。
+ * PDF 文档入口 —— 全部模板 × 7 种布局骨架。
  *
  * 结构由 layout 骨架决定,视觉由 theme token 决定:
  * 与 HTML 端(`components/editor/template-renderer.tsx`)同源同构,

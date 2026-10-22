@@ -1,8 +1,8 @@
-# 简历模板库（32 套模板）实施计划
+# 简历模板库（82 套模板 = 首批 32 套 + 扩展 50 套）实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 dl-resume 新增模板库模块，提供 32 套视觉明显不同的简历模板，支持从模板创建简历、编辑中换模板、预览与 PDF 双端对齐。
+**Goal:** 为 dl-resume 新增模板库模块，提供 82 套视觉明显不同的简历模板（首批 32 套 + 扩展 50 套），支持从模板创建简历、编辑中换模板、预览与 PDF 双端对齐。
 
 **Architecture:** 模板 = 数据（`TemplateDef`：`layout` 骨架 + `theme` token + 专属装饰层 + 范文）。HTML 端把 token 注入 CSS 变量、PDF 端把 token 喂给 `StyleSheet.create`，同一份 token 双端共用，从结构上消除预览/PDF 漂移。7 个骨架在 HTML 与 PDF 各有一份一一对应的实现。
 
@@ -1319,16 +1319,67 @@ git commit -m "test: 模板库全量回归与 32 套 PDF 导出验证"
 
 ---
 
-## 附录：32 套模板的骨架与 token 速查
+### Task 10: 扩展批次 —— 再加 50 套（合计 82 套）
 
-实施时以设计文档第 3 节表格为唯一真源，此处仅供快速查阅骨架分布：
+**背景：** 首批 32 套把 7 个骨架都用上了，但单栏占 17 套、时间轴 / 右侧栏 / 项目卡片各只有 1～2 套，模板库整体偏同质。用户要求"再多设置 50 个模板，不能和之前设计的重复"。
+
+**核心手段：先扩 token 维度，再填数据。** 模板的视觉差异 = 骨架 + token 维度组合 + 专属装饰。只堆数据而不扩维度，50 套很快就会用尽组合空间。
+
+**Step 1: 扩两个高杠杆 token 维度（HTML + PDF 双端）**
+
+- `ThemeTokens.headerStyle`：`auto` / `inline` / `center` / `stack` / `boxed` / `band`
+  - HTML：`components/editor/layouts/parts.tsx` 的 `HeaderBlock` 按 `theme.headerStyle` 分派；CSS 新增 `.hd_auto` / `.hd_inline` / `.hd_center` / `.hd_stack` / `.hd_boxed` / `.hd_band`
+  - PDF：`lib/pdf/theme-styles.ts` 新增 `headerStack` / `headerBoxed` / `headerBand` / `bandName` / `bandLabel` / `bandContact` / `bandOneLine`；`lib/pdf/layouts/parts.tsx` 的 `HeaderBlock` 同样分派
+  - **`auto` = 沿用骨架默认**（单栏经典居中、其余左对齐），存量 32 套全部保持 `auto` → 外观零变化
+- 标题形态 `+bracket`（【标题】）/ `+solid`（墨色实心块）/ `+outline`（描边框）
+- 姓名形态 `+frame`（描边框）/ `+bracket`（【姓名】）
+- 头像形态 `+ring`（双环）
+  - 这三组 HTML / PDF 都有实现 → 双端同步生效
+  - PDF 端**禁止 letterSpacing**（v4 会拆散文本层），因此没有采用字距型标题形态
+
+**Step 2: 写 50 套注册数据（`lib/templates/registry.ts`）**
+
+九个维度全部错开：骨架 / 主色 / 字体 / 抬头 / 标题 / 技能 / 姓名 / 头像 / 专属装饰。50 个主色互不相同，且与首批 32 套主色集合无交集。
+
+**Step 3: 写 50 段专属装饰层（`components/editor/templates.module.css`）**
+
+每套只给一个明确手法（细线 / 点阵 / 双竖条 / 印章 / 网格 / 折线 / 波浪 / 装订线 / 刻度 …）。**注意 CSS Modules 的纯选择器约束**：根元素装饰必须写成 `[data-tpl="<id>"].preview`，裸的 `[data-tpl="<id>"]`（含 `::after`）会报 `Selector is not pure` 并让整页 CSS 编译失败。
+
+**Step 4: 把"不重复"变成可执行断言（`registry.test.ts`）**
+
+- 首批 32 套之后追加的批次：主色互不重复、且不复用首批主色
+- 六元组（骨架 + 主色 + 字体 + 抬头 + 标题 + 姓名）全局唯一
+- 中文名唯一
+- 7 个骨架全覆盖，且任一骨架占比 < 35%
+- 维度覆盖：字体 3 / 标题 10 / 技能 4 / 头像 5 / 姓名 6 / 抬头 6 / 风格组 8 必须全部用到
+
+**Step 5: 装饰层静态校验（`components/editor/templates-css.test.ts`，新增）**
+
+跨 CSS Module 引用不到对方的哈希类名，拼错类名不会报错、只会静默失效 —— 这个测试静态解析 CSS，断言：每套模板都有 `[data-tpl]` 装饰块、装饰里引用的类名都在骨架里定义过、没有孤儿 id。
+
+**Step 6: 回归**
+
+- `npm run typecheck` → 0 error
+- `npx vitest run` → 25 files / 286 tests passed（含"全部模板都能生成可解析的 PDF"82 套）
+- `npm run build` → exit 0
+- 浏览器走查：编辑器内逐套切换 82 套模板并截图，**MD5 比对证明 82 张预览两两像素不同**
+
+**验收：** 见设计文档 §10 第 9 条。
+
+---
+
+
+## 附录：82 套模板的骨架与 token 速查
+
+实施时以设计文档第 3 节表格为唯一真源，此处仅供快速查阅骨架分布（首批 32 套 + 扩展 50 套）：
 
 | 骨架 | 模板 id |
 |---|---|
-| 单栏经典 | pure-minimal, classic, gold-luxury, elegant-serif, cream, pearl, academic, paper-serif |
-| 单栏现代 | mono-line, ink-brush, gray-underline, modern, tech-gradient, fresh-mint, champagne, minimal, compact |
-| 双栏均衡 | mono-grid, blue-corporate, code-style, sky-blue, creative-bold, two-col-pro, lab-report |
-| 左侧栏 | navy-elegant, dark-tech, sakura, infographic |
-| 右侧栏 | luxury-dark |
-| 时间轴 | timeline-style |
-| 项目卡片 | designer, magazine |
+| 单栏经典 | pure-minimal, classic, gold-luxury, cream, elegant-serif, pearl, academic, paper-serif, ivory-line, hairline-frame, burgundy, midnight-navy, pixel-block, sea-salt, rose-pearl, jade-seal, ivory-gilt, ats-pure, ledger-line, scholar-indigo, citation-num |
+| 单栏现代 | mono-line, ink-brush, gray-underline, modern, tech-gradient, fresh-mint, champagne, minimal, compact, dot-matrix, mist-box, indigo-double, violet-orbit, matcha-vert, champagne-line, marker-scribble, onepage-draft, checklist, thesis-tight, course-card |
+| 双栏均衡 | mono-grid, blue-corporate, code-style, sky-blue, creative-bold, two-col-pro, lab-report, graphite-band, slate-pro, bronze-plaque, matrix-term, latte-cream, obsidian, platinum-dot, mocha-frame, split-neon, table-grid, blueprint-grid, review-margin |
+| 左侧栏 | navy-elegant, dark-tech, sakura, infographic, pine-ink, indigo-night, lavender-veil, lab-axis |
+| 右侧栏 | luxury-dark, steel-edge, cold-steel, dossier-file |
+| 时间轴 | timeline-style, willow-slash, zigzag-div |
+| 项目卡片 | designer, magazine, neon-ring, holo-card, peach-jelly, sticker-pop, comic-panel |
+

@@ -47,6 +47,7 @@ export const FALLBACK_THEME: ThemeTokens = {
   skill: "dots",
   avatar: "none",
   nameStyle: "plain",
+  headerStyle: "auto",
 };
 
 function createStyles(theme: ThemeTokens) {
@@ -85,6 +86,40 @@ function createStyles(theme: ThemeTokens) {
       paddingBottom: 0,
       marginBottom: 18,
     },
+    /* ─── 抬头形态(与 HTML 端 .hd_* 一一对应)──────────────────────── */
+    /** 纵向堆叠:头像在上、姓名在下 */
+    headerStack: {
+      flexDirection: "column",
+      alignItems: "flex-start",
+    },
+    headerStackText: {
+      width: "100%",
+    },
+    /** 描边框抬头 */
+    headerBoxed: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: theme.radius,
+      paddingTop: 14,
+      paddingBottom: 14,
+      paddingLeft: 16,
+      paddingRight: 16,
+      marginBottom: 16,
+    },
+    /** 主色带抬头 */
+    headerBand: {
+      backgroundColor: theme.accent,
+      borderRadius: theme.radius,
+      paddingTop: 12,
+      paddingBottom: 12,
+      paddingLeft: 16,
+      paddingRight: 16,
+      marginBottom: 16,
+    },
+    bandName: { color: "#ffffff" },
+    bandLabel: { color: "rgba(255,255,255,0.86)" },
+    bandContact: { color: "rgba(255,255,255,0.86)" },
+    bandOneLine: { color: "rgba(255,255,255,0.86)" },
     headerMain: {
       flexDirection: "row",
       alignItems: "center",
@@ -108,6 +143,7 @@ function createStyles(theme: ThemeTokens) {
     avatarCircle: { borderRadius: 9999 },
     avatarSquare: { borderRadius: 0 },
     avatarRounded: { borderRadius: 6 },
+    avatarRing: { borderRadius: 9999, borderWidth: 2, borderColor: theme.accent },
     name: {
       fontSize: 22 * fs,
       fontWeight: 700,
@@ -130,6 +166,16 @@ function createStyles(theme: ThemeTokens) {
     },
     nameBig: {
       fontSize: 26 * fs,
+    },
+    nameFrame: {
+      borderWidth: 1.5,
+      borderColor: theme.accent,
+      borderRadius: theme.radius,
+      paddingTop: 2,
+      paddingBottom: 2,
+      paddingLeft: 10,
+      paddingRight: 10,
+      alignSelf: "flex-start",
     },
     label: {
       fontSize: base,
@@ -204,6 +250,33 @@ function createStyles(theme: ThemeTokens) {
     headingSerif: {
       fontFamily,
       fontSize: title + 1,
+    },
+    /* ─── 新增标题形态(与 HTML 端 .hdg_* 一一对应)───────────────── */
+    /** 【标题】—— 方括号由调用点包在文字外,样式只负责配色 */
+    headingBracket: {
+      color: theme.accent,
+    },
+    /** 墨色实心块 */
+    headingSolid: {
+      backgroundColor: theme.ink,
+      color: "#ffffff",
+      paddingTop: 3,
+      paddingBottom: 3,
+      paddingLeft: 10,
+      paddingRight: 10,
+      alignSelf: "flex-start",
+    },
+    /** 描边框标题 */
+    headingOutline: {
+      borderWidth: 1,
+      borderColor: theme.accent,
+      borderRadius: theme.radius,
+      paddingTop: 2,
+      paddingBottom: 2,
+      paddingLeft: 10,
+      paddingRight: 10,
+      color: theme.accent,
+      alignSelf: "flex-start",
     },
 
     /* ─── 侧栏 ─────────────────────────────────────────────────── */

@@ -6,7 +6,7 @@ import { SAMPLE_PROFESSIONAL } from "@/lib/templates/samples";
 import { EMPTY_RESUME_DATA } from "@/lib/validation/resume";
 
 describe("TemplateRenderer", () => {
-  it("全部 32 套模板都能渲染出范文里的姓名", () => {
+  it("全部模板都能渲染出范文里的姓名", () => {
     for (const def of TEMPLATES) {
       const html = renderToStaticMarkup(
         <TemplateRenderer def={def} data={SAMPLE_PROFESSIONAL} />,

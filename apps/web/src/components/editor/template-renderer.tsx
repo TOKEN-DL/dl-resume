@@ -4,7 +4,7 @@
  * 模板预览用的中文字体。
  *
  * 三族都是分片 + unicode-range 的 webfont,浏览器只下载真正用到字形的分片,
- * 不会因为 32 套模板就拖进几十 MB 字体。
+ * 不会因为模板数量增长就拖进几十 MB 字体。
  *   Noto Sans SC  — 黑体(通用)
  *   Noto Serif SC — 宋体(正式 / 文艺)
  *   LXGW WenKai  — 楷体(清新 / 手写感)

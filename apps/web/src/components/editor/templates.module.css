@@ -163,6 +163,10 @@
 .av_square { border-radius: 0; }
 .av_rounded { border-radius: 12px; }
 .av_none { /* 不渲染头像 */ }
+.av_ring {
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 4.5px var(--accent);
+}
 
 .name {
   margin: 0;
@@ -190,6 +194,16 @@
 }
 
 .nm_big .name { font-size: 32px; letter-spacing: 2px; }
+
+.nm_frame .name {
+  display: inline-block;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 3px 14px;
+}
+
+.nm_bracket .name::before { content: "【"; }
+.nm_bracket .name::after { content: "】"; }
 
 .label {
   margin-top: 4px;
@@ -234,6 +248,52 @@
 }
 
 .contactValue { color: var(--ink); }
+
+/* ─── 抬头形态(HTML 端)────────────────────────────────────────── */
+
+/* auto:沿用骨架默认(单栏经典居中,其余左对齐) */
+.hd_auto .headerMain { justify-content: flex-start; }
+
+/* inline:头像与姓名左右并列 */
+.hd_inline .headerMain { justify-content: flex-start; align-items: center; }
+
+/* center:整体居中 */
+.hd_center .headerMain { justify-content: center; }
+.hd_center .contact { justify-content: center; }
+
+/* stack:头像在上、姓名在下,纵向堆叠 */
+.hd_stack .headerMain {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.hd_stack .headerText { width: 100%; }
+.hd_stack .avatar { width: 72px; height: 72px; }
+
+/* boxed:抬头整体加描边框 */
+.hd_boxed .header {
+  border: 1px solid var(--border);
+  border-bottom-width: 1px;
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  background: var(--paper);
+}
+
+/* band:抬头铺满主色带 */
+.hd_band .header {
+  background: var(--accent);
+  border-bottom: none;
+  border-radius: var(--radius);
+  padding: 16px 20px;
+}
+.hd_band .name { color: #fff; }
+.hd_band .label,
+.hd_band .contact,
+.hd_band .oneLine { color: rgba(255, 255, 255, 0.86); }
+.hd_band .nm_underline .name { border-bottom-color: rgba(255, 255, 255, 0.6); }
+.hd_band .nm_frame .name { border-color: rgba(255, 255, 255, 0.55); }
+.hd_band .nm_band .name { background: rgba(255, 255, 255, 0.16); }
+.hd_band .avatar { border-color: rgba(255, 255, 255, 0.5); }
 
 /* ─── block ────────────────────────────────────────────────────── */
 .block {
@@ -308,6 +368,38 @@
   letter-spacing: 2px;
   border-bottom: none;
   color: var(--ink);
+}
+
+/* ─── 新增标题形态(HTML 端)───────────────────────────────────────── */
+
+/* 【标题】—— 与 PDF 端同样包裹方括号 */
+.hdg_bracket .blockTitle::before { content: "【"; }
+.hdg_bracket .blockTitle::after { content: "】"; }
+.hdg_bracket .blockTitle {
+  border-bottom: none;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+
+/* 墨色实心块 */
+.hdg_solid .blockTitle {
+  display: inline-block;
+  background: var(--ink);
+  color: #fff;
+  padding: 3px 12px;
+  border-radius: 0;
+  border-bottom: none;
+  font-weight: 600;
+}
+
+/* 描边框标题 */
+.hdg_outline .blockTitle {
+  display: inline-block;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 2px 12px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
 }
 
 /* ─── 条目 ─────────────────────────────────────────────────────── */
@@ -974,4 +1066,525 @@
 [data-tpl="lab-report"] .twoColGrid {
   gap: 0 26px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+ * 扩展批次:新增 50 套模板的专属装饰层。
+ * 每套只给一个明确、可辨识的视觉手法(细线 / 点阵 / 竖条 / 印章 /
+ * 卡片 / 网格 / 折线 …),与首批 32 套的装饰语汇错开。
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* ─── 极简黑白 ─────────────────────────────────────────────────── */
+
+/* 象牙细线 —— 姓名上下各一道细线,整体收紧 */
+[data-tpl="ivory-line"] .name {
+  display: inline-block;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding: 6px 2px;
+  letter-spacing: 4px;
+}
+[data-tpl="ivory-line"] .block { margin-bottom: 26px; }
+
+/* 灰点阵 —— 章节标题前一段点阵节奏 */
+[data-tpl="dot-matrix"] .blockTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-tpl="dot-matrix"] .blockTitle::before {
+  content: "";
+  flex: none;
+  width: 28px;
+  height: 4px;
+  background-image: radial-gradient(circle, var(--accent) 1.2px, transparent 1.5px);
+  background-size: 7px 4px;
+  background-repeat: repeat-x;
+}
+
+/* 毫线描框 —— 分节用发丝线框出,标题带描边 */
+[data-tpl="hairline-frame"] .block {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+[data-tpl="hairline-frame"] .name { letter-spacing: 6px; }
+
+/* 石墨横带 —— 抬头压深色横带,双栏之间加竖线 */
+[data-tpl="graphite-band"] .twoColGrid { gap: 0 28px; }
+[data-tpl="graphite-band"] .twoColItem {
+  border-left: 1px solid var(--border);
+  padding-left: 22px;
+}
+
+/* 雾灰方框 —— 标题左侧一小段灰竖条 */
+[data-tpl="mist-box"] .blockTitle {
+  position: relative;
+  padding-left: 14px;
+}
+[data-tpl="mist-box"] .blockTitle::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+/* ─── 商务经典 ─────────────────────────────────────────────────── */
+
+/* 石板专业 —— 侧栏每节用细线分区 */
+[data-tpl="slate-pro"] .sideSection {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+[data-tpl="slate-pro"] .sideTitle { letter-spacing: 2px; }
+
+/* 酒红古典 —— 姓名压一道酒红金线 */
+[data-tpl="burgundy"] .name {
+  display: inline-block;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 6px;
+}
+[data-tpl="burgundy"] .blockTitle { letter-spacing: 3px; }
+
+/* 松墨绿 —— 左侧整栏铺浅绿底 + 右侧深绿边 */
+[data-tpl="pine-ink"] .side {
+  background: var(--accent-soft);
+  border-right: 2px solid var(--accent);
+}
+[data-tpl="pine-ink"] .sideTitle {
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+}
+
+/* 靛蓝双线 —— 章节标题前两道靛蓝竖条 */
+[data-tpl="indigo-double"] .blockTitle {
+  background-image: linear-gradient(
+    to right,
+    var(--accent) 0 3px,
+    transparent 3px 6px,
+    var(--accent) 6px 9px,
+    transparent 9px
+  );
+  background-repeat: no-repeat;
+  background-size: 9px 100%;
+  background-position: left center;
+  border-left: none;
+  padding-left: 18px;
+}
+
+/* 古铜牌 —— 右上角一枚编号方牌 */
+[data-tpl="bronze-plaque"].preview {
+  position: relative;
+}
+[data-tpl="bronze-plaque"].preview::after {
+  content: "01";
+  position: absolute;
+  top: 30px;
+  right: 34px;
+  width: 34px;
+  height: 34px;
+  line-height: 32px;
+  text-align: center;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+/* 午夜藏蓝 —— 首段首字下沉 */
+[data-tpl="midnight-navy"] .rich > p:first-child::first-letter {
+  float: left;
+  font-size: 38px;
+  line-height: 0.9;
+  padding: 3px 8px 0 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* 钢蓝锐边 —— 右栏用点线收边 */
+[data-tpl="steel-edge"] .side { border-left: 2px dotted var(--accent); }
+[data-tpl="steel-edge"] .sideTitle { letter-spacing: 3px; }
+
+/* ─── 现代科技 ─────────────────────────────────────────────────── */
+
+/* 矩阵终端 —— 条目前挂终端提示符,姓名带辉光 */
+[data-tpl="matrix-term"] .entryTitle::before {
+  content: "$ ";
+  color: var(--accent);
+  opacity: 0.75;
+}
+[data-tpl="matrix-term"] .name {
+  color: var(--accent);
+  text-shadow: 0 0 14px rgba(74, 222, 128, 0.4);
+}
+
+/* 靛夜 —— 深底上的头像光环 */
+[data-tpl="indigo-night"] .avatar {
+  box-shadow: 0 0 0 3px var(--accent), 0 0 24px rgba(129, 140, 248, 0.45);
+}
+[data-tpl="indigo-night"] .sideTitle { color: var(--accent); }
+
+/* 霓虹环 —— 卡片描边发光 */
+[data-tpl="neon-ring"] .card {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.22);
+}
+[data-tpl="neon-ring"] .cardTitle { color: var(--accent); }
+
+/* 紫轨 —— 头像外面套两圈轨道 */
+[data-tpl="violet-orbit"] .avatar {
+  box-shadow:
+    0 0 0 4px var(--paper),
+    0 0 0 6px var(--accent),
+    0 0 0 10px var(--paper),
+    0 0 0 12px var(--accent);
+}
+[data-tpl="violet-orbit"] .name { color: var(--accent); }
+
+/* 冷钢 —— 右栏内嵌一道渐变竖条 */
+[data-tpl="cold-steel"] .side { position: relative; }
+[data-tpl="cold-steel"] .side::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: linear-gradient(to bottom, var(--accent), transparent 88%);
+}
+
+/* 全息卡 —— 卡片顶边一条渐变光带 */
+[data-tpl="holo-card"] .card {
+  border-top: none;
+  padding-top: 14px;
+  position: relative;
+  overflow: hidden;
+}
+[data-tpl="holo-card"] .card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), #22d3ee, var(--accent));
+}
+
+/* 像素方块 —— 头像像素化 + 硬边红框 */
+[data-tpl="pixel-block"] .avatar {
+  image-rendering: pixelated;
+  border: 3px solid var(--accent);
+}
+[data-tpl="pixel-block"] .blockTitle { letter-spacing: 2px; }
+
+/* ─── 清新雅致 ─────────────────────────────────────────────────── */
+
+/* 抹茶竖条 —— 纸面左侧一道草绿竖边 */
+[data-tpl="matcha-vert"].preview { border-left: 8px solid var(--accent-soft); }
+[data-tpl="matcha-vert"] .blockTitle {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+
+/* 蜜桃果冻 —— 卡片整块换成果冻底色 */
+[data-tpl="peach-jelly"] .card {
+  border: none;
+  border-radius: 18px;
+  background: var(--accent-soft);
+}
+[data-tpl="peach-jelly"] .cardTitle { color: var(--accent); }
+
+/* 薰衣草纱 —— 侧栏每节铺淡紫圆角底 */
+[data-tpl="lavender-veil"] .sideSection {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 12px;
+}
+[data-tpl="lavender-veil"] .skillTag { border-radius: 999px; }
+
+/* 海盐波纹 —— 分节底部一行波点 */
+[data-tpl="sea-salt"] .block {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+[data-tpl="sea-salt"] .blockTitle::after {
+  content: "";
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  background-image: radial-gradient(circle at 3px 2px, var(--accent) 1.6px, transparent 2px);
+  background-size: 9px 4px;
+  background-repeat: repeat-x;
+  opacity: 0.55;
+}
+
+/* 垂柳斜杠 —— 标题前一道斜杠,时间轴节点转 45° */
+[data-tpl="willow-slash"] .blockTitle::before {
+  content: "/";
+  color: var(--accent);
+  margin-right: 5px;
+  font-weight: 400;
+}
+[data-tpl="willow-slash"] .timelineNode {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+/* 拿铁奶咖 —— 经历条目变成圆角奶咖卡 */
+[data-tpl="latte-cream"] .entry {
+  background: var(--accent-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+[data-tpl="latte-cream"] .entryTitle { color: var(--accent); }
+
+/* ─── 优雅高级 ─────────────────────────────────────────────────── */
+
+/* 珠玫 —— 衬线大标题拉开字距 */
+[data-tpl="rose-pearl"] .name { letter-spacing: 8px; }
+[data-tpl="rose-pearl"] .blockTitle {
+  letter-spacing: 4px;
+  color: var(--accent);
+}
+
+/* 玄墨 —— 近黑纸面上把标题与经历名点亮成银灰 */
+[data-tpl="obsidian"] .name { color: var(--accent); }
+[data-tpl="obsidian"] .blockTitle {
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+[data-tpl="obsidian"] .entryTitle { color: var(--accent); }
+
+/* 铂金点 —— 标题用点线分隔 */
+[data-tpl="platinum-dot"] .blockTitle {
+  border-bottom: 2px dotted var(--accent);
+  padding-bottom: 4px;
+}
+[data-tpl="platinum-dot"] .sideTitle { letter-spacing: 3px; }
+
+/* 香槟细线 —— 分节用发丝线分栏,标题极细 */
+[data-tpl="champagne-line"] .block {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+[data-tpl="champagne-line"] .name { font-weight: 500; }
+
+/* 翡翠印 —— 右下角一枚玉色印章 */
+[data-tpl="jade-seal"].preview { position: relative; }
+[data-tpl="jade-seal"].preview::after {
+  content: "印";
+  position: absolute;
+  right: 44px;
+  bottom: 44px;
+  width: 42px;
+  height: 42px;
+  line-height: 40px;
+  text-align: center;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 19px;
+  transform: rotate(-6deg);
+  opacity: 0.75;
+}
+
+/* 摩咖细框 —— 双栏每栏都套细框 */
+[data-tpl="mocha-frame"] .twoColItem {
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 4px;
+}
+[data-tpl="mocha-frame"] .blockTitle { letter-spacing: 2px; }
+
+/* 象牙鎏金 —— 章节块右下投影,像烫金压印 */
+[data-tpl="ivory-gilt"] .blockTitle {
+  box-shadow: 4px 4px 0 var(--accent-soft);
+}
+[data-tpl="ivory-gilt"] .name { letter-spacing: 6px; }
+
+/* ─── 创意个性 ─────────────────────────────────────────────────── */
+
+/* 贴纸潮 —— 卡片右上角贴一枚旋转色块 */
+[data-tpl="sticker-pop"] .card { position: relative; }
+[data-tpl="sticker-pop"] .card::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  background: var(--accent);
+  border-radius: 6px 14px 6px 14px;
+  transform: rotate(12deg);
+}
+[data-tpl="sticker-pop"] .cardTitle { color: var(--accent); }
+
+/* 撞色霓虹 —— 两栏顶边一主一辅,直接撞色 */
+[data-tpl="split-neon"] .twoColGrid { gap: 0 24px; }
+[data-tpl="split-neon"] .twoColItem {
+  border-top: 3px solid var(--accent);
+  padding-top: 12px;
+}
+[data-tpl="split-neon"] .twoColItem:nth-child(even) { border-top-color: var(--ink); }
+
+/* 马克笔 —— 标题和姓名底下垫一条手绘荧光笔 */
+[data-tpl="marker-scribble"] .blockTitle {
+  border-bottom: none;
+  background-image: linear-gradient(
+    transparent 62%,
+    var(--accent-soft) 62%,
+    var(--accent-soft) 88%,
+    transparent 88%
+  );
+}
+[data-tpl="marker-scribble"] .name {
+  background-image: linear-gradient(transparent 72%, var(--accent-soft) 72%);
+}
+
+/* 漫画格 —— 卡片粗黑描边 + 网点底 */
+[data-tpl="comic-panel"] .card {
+  border: 2px solid var(--ink);
+  border-top-width: 6px;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1.3px);
+  background-size: 6px 6px;
+}
+[data-tpl="comic-panel"] .cardTitle { letter-spacing: 2px; }
+
+/* 折线 —— 时间轴竖线做成一段段虚线,节点转 45° */
+[data-tpl="zigzag-div"] .timeline::before {
+  width: 3px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--accent) 0 8px,
+    transparent 8px 14px
+  );
+}
+[data-tpl="zigzag-div"] .timelineNode {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+/* ─── 简洁实用 ─────────────────────────────────────────────────── */
+
+/* 一页速写 —— 整体压紧,尽量塞进一页 */
+[data-tpl="onepage-draft"] .block { margin-bottom: 11px; }
+[data-tpl="onepage-draft"] .entry { margin-bottom: 7px; }
+[data-tpl="onepage-draft"] .rich { line-height: 1.42; }
+
+/* 纯文本 —— 明确的零装饰,标题只留字号差 */
+[data-tpl="ats-pure"] .name { font-weight: 600; letter-spacing: 0; }
+[data-tpl="ats-pure"] .blockTitle {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+[data-tpl="ats-pure"] .block { margin-bottom: 13px; }
+
+/* 表格版 —— 条目之间画表格线 */
+[data-tpl="table-grid"] .entry {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+[data-tpl="table-grid"] .entryHead {
+  border-bottom: 1px dotted var(--border);
+  padding-bottom: 2px;
+}
+
+/* 清单式 —— 每个条目前挂一个方框 */
+[data-tpl="checklist"] .entryTitle::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  margin-right: 8px;
+}
+[data-tpl="checklist"] .blockTitle {
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}
+
+/* 账册装订 —— 纸面左侧一道双线装订边 */
+[data-tpl="ledger-line"].preview { border-left: 3px double var(--accent); }
+[data-tpl="ledger-line"] .blockTitle { letter-spacing: 2px; }
+
+/* 蓝图 —— 纸面铺工程网格 */
+[data-tpl="blueprint-grid"].preview {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+[data-tpl="blueprint-grid"] .blockTitle { letter-spacing: 2px; }
+
+/* ─── 学术稳重 ─────────────────────────────────────────────────── */
+
+/* 学者靛 —— 正文首行缩进两格,像引文 */
+[data-tpl="scholar-indigo"] .rich p { text-indent: 2em; }
+[data-tpl="scholar-indigo"] .name { letter-spacing: 6px; }
+
+/* 论文紧排 —— 论文式窄行距 */
+[data-tpl="thesis-tight"] .rich { line-height: 1.45; }
+[data-tpl="thesis-tight"] .block { margin-bottom: 12px; }
+[data-tpl="thesis-tight"] .entry { margin-bottom: 6px; }
+
+/* 实验坐标 —— 左栏每节带刻度 */
+[data-tpl="lab-axis"] .sideSection {
+  position: relative;
+  padding-left: 14px;
+}
+[data-tpl="lab-axis"] .sideSection::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 6px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--accent) 0 2px,
+    transparent 2px 8px
+  );
+}
+
+/* 引文编号 —— 标题带细线,姓名拉开字距 */
+[data-tpl="citation-num"] .blockTitle {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+}
+[data-tpl="citation-num"] .entryRange {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+[data-tpl="citation-num"] .name { letter-spacing: 5px; }
+
+/* 评审批注 —— 双栏之间加一道批注边 */
+[data-tpl="review-margin"] .twoColGrid { gap: 0 20px; }
+[data-tpl="review-margin"] .twoColItem {
+  border-left: 2px solid var(--accent);
+  padding-left: 16px;
+}
+
+/* 课程卡 —— 经历条目变成课程卡 */
+[data-tpl="course-card"] .entry {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+[data-tpl="course-card"] .entryTitle { color: var(--accent); }
+
+/* 档案卷宗 —— 右栏铺灰底,标题带编号感 */
+[data-tpl="dossier-file"] .side { background: var(--accent-soft); }
+[data-tpl="dossier-file"] .sideTitle {
+  border-bottom: 1px solid var(--accent);
+  padding-bottom: 4px;
+  letter-spacing: 2px;
+}
+[data-tpl="dossier-file"] .name { letter-spacing: 4px; }
 

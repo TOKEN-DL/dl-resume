@@ -110,12 +110,21 @@ export function HeaderBlock({
   const s = buildThemeStyles(theme);
   const b = data.basics;
 
+  // 抬头形态:theme.headerStyle 优先,"auto" 沿用骨架传入的默认(居中 / 不居中)
+  const hs = theme.headerStyle;
+  const isCentered = hs === "center" || (hs === "auto" && centered);
+  const isBand = hs === "band";
+  const isBoxed = hs === "boxed";
+  const isStack = hs === "stack";
+
   const avatarShape =
     theme.avatar === "circle"
       ? s.avatarCircle
       : theme.avatar === "square"
         ? s.avatarSquare
-        : s.avatarRounded;
+        : theme.avatar === "ring"
+          ? s.avatarRing
+          : s.avatarRounded;
   const nameShape =
     theme.nameStyle === "underline"
       ? s.nameUnderline
@@ -123,25 +132,52 @@ export function HeaderBlock({
         ? s.nameBand
         : theme.nameStyle === "big"
           ? s.nameBig
-          : null;
+          : theme.nameStyle === "frame"
+            ? s.nameFrame
+            : null;
+  // 【姓名】—— 与 HTML 端 .nm_bracket 的伪元素保持一致
+  const nameText =
+    theme.nameStyle === "bracket"
+      ? `【${b.name || "未填写姓名"}】`
+      : b.name || "未填写姓名";
+
+  const containerStyle = isBand
+    ? s.headerBand
+    : isBoxed
+      ? s.headerBoxed
+      : flush
+        ? s.headerFlush
+        : s.header;
+  const mainStyle = isStack ? s.headerStack : isCentered ? s.headerMainCenter : s.headerMain;
+  const textStyle = isStack ? s.headerStackText : isCentered ? s.headerTextCenter : s.headerText;
 
   return (
-    <View style={flush ? s.headerFlush : s.header}>
-      <View style={centered ? s.headerMainCenter : s.headerMain}>
+    <View style={containerStyle}>
+      <View style={mainStyle}>
         {b.avatar && theme.avatar !== "none" && isRenderableImage(b.avatar) && (
           <Image src={b.avatar} style={[s.avatar, avatarShape]} />
         )}
-        <View style={centered ? s.headerTextCenter : s.headerText}>
-          <Text style={[s.name, nameShape ?? undefined]}>{b.name || "未填写姓名"}</Text>
-          {!!b.label && <Text style={s.label}>{b.label}</Text>}
+        <View style={textStyle}>
+          <Text style={[s.name, nameShape ?? undefined, isBand ? s.bandName : undefined]}>
+            {nameText}
+          </Text>
+          {!!b.label && <Text style={[s.label, isBand ? s.bandLabel : undefined]}>{b.label}</Text>}
           {/* 与 HTML 端保持一致:不用符号字形,避免字体缺字形导致显示不一致 */}
-          <View style={[s.contact, centered ? s.contactCenter : undefined]}>
+          <View
+            style={[
+              s.contact,
+              isCentered ? s.contactCenter : undefined,
+              isBand ? s.bandContact : undefined,
+            ]}
+          >
             {b.email && <Text style={s.contactItem}>邮箱 {b.email}</Text>}
             {b.phone && <Text style={s.contactItem}>电话 {b.phone}</Text>}
             {b.location && <Text style={s.contactItem}>所在地 {b.location}</Text>}
             {b.gender && <Text style={s.contactItem}>· {genderLabel(b.gender)}</Text>}
           </View>
-          {!!b.summary && <Text style={s.oneLine}>{b.summary}</Text>}
+          {!!b.summary && (
+            <Text style={[s.oneLine, isBand ? s.bandOneLine : undefined]}>{b.summary}</Text>
+          )}
         </View>
       </View>
     </View>
@@ -165,6 +201,12 @@ function headingVariant(s: ThemeStyles, theme: ThemeTokens) {
       return s.headingIndex;
     case "serif":
       return s.headingSerif;
+    case "bracket":
+      return s.headingBracket;
+    case "solid":
+      return s.headingSolid;
+    case "outline":
+      return s.headingOutline;
     case "rule":
     default:
       return s.headingRule;
@@ -186,9 +228,11 @@ export function SectionBlock({
 }) {
   const s = buildThemeStyles(theme);
   const label = theme.heading === "index" && index ? `${index} ${title}` : title;
+  // 【标题】—— 与 HTML 端 .hdg_bracket 的伪元素保持一致
+  const shown = theme.heading === "bracket" ? `【${label}】` : label;
   return (
     <View style={s.block}>
-      <Text style={[s.blockTitle, headingVariant(s, theme)]}>{label}</Text>
+      <Text style={[s.blockTitle, headingVariant(s, theme)]}>{shown}</Text>
       {children}
     </View>
   );

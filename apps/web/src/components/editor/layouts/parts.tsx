@@ -164,12 +164,16 @@ export function HeaderBlock({
   layout: LayoutKind;
 }) {
   const b = data.basics;
-  // 单栏经典骨架用居中大标题,其余骨架一律左对齐
-  const centered = layout === "single-classic";
+  // 抬头形态优先取 theme.headerStyle;
+  // "auto" 表示沿用骨架默认(单栏经典居中大标题,其余骨架左对齐)——存量模板行为不变。
+  const style = theme.headerStyle;
+  const centered = style === "center" || (style === "auto" && layout === "single-classic");
   const avatarCls = styles[`av_${theme.avatar}`];
   return (
     <header
-      className={`${styles.header} ${styles[`nm_${theme.nameStyle}`]} ${centered ? styles.headerCenter : ""}`}
+      className={`${styles.header} ${styles[`nm_${theme.nameStyle}`]} ${styles[`hd_${style}`]} ${
+        centered ? styles.headerCenter : ""
+      }`}
     >
       <div className={styles.headerMain}>
         {b.avatar && theme.avatar !== "none" && (

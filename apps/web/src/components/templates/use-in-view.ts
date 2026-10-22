@@ -7,7 +7,7 @@ import { useEffect, useState, type RefObject } from "react";
  *
  * 语义:
  *   - 元素进入视口附近(rootMargin)时返回 true,离开时返回 false。
- *     **不是**「进入过就一直 true」——32 套模板的缩略图都是完整的 A4 页面 DOM,
+ *     **不是**「进入过就一直 true」——每套模板的缩略图都是完整的 A4 页面 DOM,
  *     全部永久挂载会把浏览器的布局/绘制压垮(实测滚动直接卡死),
  *     所以离开范围就卸载,滚回来再挂。
  *   - 浏览器不支持 IntersectionObserver 时直接放行(降级为一次性渲染)。
