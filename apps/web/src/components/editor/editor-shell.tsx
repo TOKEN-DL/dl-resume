@@ -78,11 +78,17 @@ export function EditorShell({
     const update = () => {
       const el = previewWrapRef.current;
       if (!el) return;
-      const w = el.clientWidth;
-      // sheet 宽 794,左右 padding 各 64 — 实际内容 794, scale = w / 794
-      // 留点边距,用 0.95 系数
-      const s = Math.min(1, (w - 16) / 794);
-      setScale(s);
+      // 必须用 getBoundingClientRect 而不是 clientWidth:
+      // clientWidth 会因为垂直滚动条出现/消失而变化,而缩放又会改变
+      // 预览高度 → 滚动条显隐 → clientWidth 变化,形成 ResizeObserver 死循环
+      // (表现为主线程被占满,页面 load 事件永远不触发)。
+      // getBoundingClientRect().width 是 border-box 宽度,不受滚动条影响。
+      const w = el.getBoundingClientRect().width - 32; // 减去 .right 的左右 padding
+      // sheet 宽 794,留点边距,用 0.95 系数
+      const raw = Math.min(1, Math.max(0.25, (w - 16) / 794));
+      const s = Math.round(raw * 1000) / 1000; // 量化到 0.001,避免亚像素抖动
+      // 变化过小就不 setState,防止无意义的重渲染
+      setScale((prev) => (Math.abs(prev - s) < 0.001 ? prev : s));
     };
     update();
     const ro = new ResizeObserver(update);
@@ -193,7 +199,13 @@ export function EditorShell({
         <section className={styles.left}>
           <ResumeForm data={draft.data} onChange={draft.setData} />
         </section>
-        <section className={styles.right} ref={previewWrapRef}>
+        <section
+          className={styles.right}
+          ref={previewWrapRef}
+          // 预览画布固定 794px,窄屏下必然横向溢出 — 显式关掉横向滚动条,
+          // 否则它会挤占纵向空间。视觉内容是等比缩放后居中的,不会被裁掉。
+          style={{ overflowX: "hidden" }}
+        >
           <div
             className={styles.previewScale}
             style={{ transform: `scale(${scale})`, height: 1123 * scale }}

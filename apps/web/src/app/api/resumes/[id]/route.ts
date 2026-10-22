@@ -11,10 +11,12 @@ import {
   deleteResume,
   updateResume,
 } from "@/lib/resume-repo";
+import { isTemplateId } from "@/lib/templates";
 
 const patchSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
-  template: z.enum(["classic", "modern", "minimal"]).optional(),
+  // 模板 id 由注册表动态校验(32 套),不再硬编码 z.enum —— 见下方 isTemplateId 检查
+  template: z.string().trim().min(1).max(60).optional(),
   // 200KB 上限 — 简历 JSON 通常 < 50KB,这个余量足够;超过意味着滥用
   data: z.string().max(200_000).optional(),
 });
@@ -57,6 +59,14 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json(
       { error: "validation", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  // 模板 id 必须命中注册表 —— 与 POST /api/resumes 用同一套判定
+  if (parsed.data.template !== undefined && !isTemplateId(parsed.data.template)) {
+    return NextResponse.json(
+      { error: `未知模板: ${parsed.data.template}` },
       { status: 400 },
     );
   }
