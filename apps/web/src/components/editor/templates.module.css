@@ -1,58 +1,167 @@
 /**
  * 模板预览样式.
+ *
  * 视觉规范:
  *   - A4 = 210mm x 297mm → @ 96 DPI ≈ 794px x 1123px
  *   - 编辑器右栏约 50% 宽(约 500-720px),需要 transform: scale(0.6~0.8)
  *   - 预览容器固定宽 794px,父元素决定缩放
- *   - 行高、字号按 11pt 排版,适合中文阅读
+ *
+ * 所有颜色 / 字号 / 圆角来自主题 token,以 CSS 变量注入:
+ *   --accent --accent-soft --ink --muted --border --paper
+ *   --font --font-scale --line-height --radius
+ *
+ * 结构由 layout 骨架决定;每套模板的专属装饰用 [data-tpl="<id>"] 覆写。
  */
+
+/* ─── 页面外壳 ─────────────────────────────────────────────────── */
 .preview {
   width: 794px;
-  background: #fff;
+  min-height: 1123px;
+  box-sizing: border-box;
+  background: var(--paper, #fff);
   border: 1px solid var(--border, #d4d8de);
   border-radius: 4px;
-  padding: 56px 64px;
-  min-height: 1123px;
   margin: 0 auto;
-  box-sizing: border-box;
   color: var(--ink, #0f172a);
-  font-size: 14px;
-  line-height: 1.6;
+  font-family: var(--font, "Noto Sans SC", sans-serif);
+  font-size: calc(14px * var(--font-scale, 1));
+  line-height: var(--line-height, 1.6);
   transform-origin: top left;
+  overflow: hidden;
 }
 
-.tpl_classic .sheet { /* 默认样式 */ }
-.tpl_modern .sheet { /* 由 .sheet 微调 */ }
-.tpl_minimal .sheet { /* 由 .sheet 微调 */ }
+/* 单栏类骨架:页面内边距在 preview 上 */
+.laySingle { padding: 56px 64px; }
+/* 侧栏类骨架:侧栏要通到纸边,内边距交给骨架自己 */
+.laySide { padding: 0; }
+/* 双栏:头部通栏 + 正文分栏 */
+.layTwo { padding: 0; }
 
-/* ─── header ─── */
+.sheet {
+  counter-reset: tplsec;
+}
+
+.singleClassic,
+.singleModern,
+.timelineSheet,
+.cardSheet {
+  padding: 0;
+}
+
+.singleClassic .header,
+.singleModern .header { border-bottom-width: 1.5px; }
+
+.timelineSheet,
+.cardSheet { padding: 0; }
+
+/* ─── 侧栏骨架 ─────────────────────────────────────────────────── */
+.sideLayout {
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  min-height: 1121px;
+}
+
+.sideRight { grid-template-columns: 1fr 236px; }
+
+.side {
+  background: var(--accent-soft);
+  padding: 44px 30px;
+  box-sizing: border-box;
+}
+
+.sideRight .side { order: 2; }
+
+.side .header {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 22px;
+  text-align: left;
+}
+
+.side .headerMain {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+.side .name { font-size: 22px; }
+
+.sideSection { margin-bottom: 22px; }
+
+.sideTitle {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.mainCol {
+  padding: 44px 40px;
+  box-sizing: border-box;
+}
+
+/* ─── 双栏骨架 ─────────────────────────────────────────────────── */
+.twoCol {
+  display: flex;
+  flex-direction: column;
+  min-height: 1121px;
+}
+
+.twoColHead {
+  padding: 44px 48px 30px;
+  border-bottom: 1px solid var(--border);
+}
+
+.twoColHead .header {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.twoColGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 36px;
+  padding: 30px 48px 48px;
+  align-items: start;
+}
+
+.twoColItem { min-width: 0; }
+
+/* ─── header ───────────────────────────────────────────────────── */
 .header {
-  border-bottom: 1.5px solid var(--ink, #0f172a);
+  border-bottom: 1.5px solid var(--ink);
   padding-bottom: 16px;
   margin-bottom: 20px;
 }
 
-.tpl_classic .header { text-align: center; }
-.tpl_modern .header,
-.tpl_minimal .header { text-align: left; }
+.headerCenter { text-align: center; }
 
 .headerMain {
   display: flex;
   align-items: center;
   gap: 18px;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
-.tpl_modern .headerMain,
-.tpl_minimal .headerMain { justify-content: flex-start; }
+.headerCenter .headerMain { justify-content: center; }
+.headerCenter .contact { justify-content: center; }
+
+.headerText { min-width: 0; }
 
 .avatar {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
   object-fit: cover;
-  border: 1px solid var(--border, #d4d8de);
+  border: 1px solid var(--border);
+  flex: none;
 }
+
+.av_circle { border-radius: 50%; }
+.av_square { border-radius: 0; }
+.av_rounded { border-radius: 12px; }
 
 .name {
   margin: 0;
@@ -61,13 +170,26 @@
   letter-spacing: 1px;
 }
 
-.tpl_minimal .name { font-weight: 500; letter-spacing: 0; }
-.tpl_modern .name { color: var(--blue, #1e40af); }
+.nm_underline .name {
+  display: inline-block;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 2px;
+}
+
+.nm_band .name {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  padding: 4px 16px;
+  border-radius: var(--radius);
+}
+
+.nm_big .name { font-size: 32px; letter-spacing: 2px; }
 
 .label {
   margin-top: 4px;
   font-size: 14px;
-  color: var(--muted, #4b5563);
+  color: var(--muted);
 }
 
 .contact {
@@ -75,23 +197,43 @@
   gap: 12px;
   margin-top: 6px;
   font-size: 13px;
-  color: var(--muted, #4b5563);
+  color: var(--muted);
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
 }
-
-.tpl_modern .contact,
-.tpl_minimal .contact { justify-content: flex-start; }
 
 .oneLine {
   margin-top: 6px;
   font-size: 13px;
-  color: var(--muted, #4b5563);
+  color: var(--muted);
 }
 
-/* ─── block ─── */
+/* 侧栏里的联系方式列表 */
+.contactList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.contactItem {
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+.contactLabel {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.contactValue { color: var(--ink); }
+
+/* ─── block ────────────────────────────────────────────────────── */
 .block {
   margin-bottom: 16px;
+  counter-increment: tplsec;
 }
 
 .blockTitle {
@@ -99,65 +241,102 @@
   font-weight: 700;
   margin: 0 0 8px;
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--border, #d4d8de);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
 }
 
-.tpl_modern .blockTitle {
-  color: var(--blue, #1e40af);
-  border-bottom: 0;
-  border-left: 3px solid var(--blue, #1e40af);
+.blockBody { font-size: 13px; }
+
+/* 标题形态 —— 由 theme.heading 选择 */
+.hdg_rule .blockTitle {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.hdg_band .blockTitle {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  padding: 3px 10px;
+  border-bottom: none;
+  border-radius: var(--radius);
+  letter-spacing: 1px;
+}
+
+.hdg_bar .blockTitle {
+  border-bottom: none;
+  border-left: 3px solid var(--accent);
   padding-left: 8px;
+  color: var(--accent);
 }
 
-.tpl_minimal .blockTitle {
-  border-bottom: 0;
+.hdg_plain .blockTitle {
+  border-bottom: none;
   font-weight: 500;
   font-size: 13px;
-  color: var(--muted, #4b5563);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 2px;
 }
 
-.blockBody {
-  font-size: 13px;
+.hdg_underline .blockTitle {
+  display: inline-block;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 2px;
 }
 
-/* ─── period item ─── */
-.periodItem {
-  margin-bottom: 10px;
+.hdg_index .blockTitle {
+  border-bottom: none;
+  color: var(--accent);
+  letter-spacing: 1px;
 }
 
-.periodHead {
+.hdg_index .blockTitle::before {
+  content: counter(tplsec, decimal-leading-zero) " ";
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+.hdg_serif .blockTitle {
+  font-family: var(--font);
+  font-size: 16px;
+  letter-spacing: 2px;
+  border-bottom: none;
+  color: var(--ink);
+}
+
+/* ─── 条目 ─────────────────────────────────────────────────────── */
+.entry { margin-bottom: 10px; }
+
+.entryHead {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
 }
 
-.periodTitle {
-  font-weight: 600;
-}
+.entryTitleWrap { min-width: 0; }
 
-.periodSubtitle {
-  color: var(--muted, #4b5563);
+.entryTitle { font-weight: 600; }
+
+.entrySubtitle {
+  color: var(--muted);
   font-weight: 400;
 }
 
-.periodRange {
-  color: var(--muted, #4b5563);
+.entryRange {
+  color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
 }
 
-.periodBody {
+.entryBody {
   margin-top: 2px;
-  color: var(--ink, #0f172a);
+  color: var(--ink);
 }
 
-/* ─── simple item ─── */
-.simpleItem {
-  margin-bottom: 8px;
-}
+/* ─── 简单条目(奖项 / 证书)────────────────────────────────────── */
+.simpleItem { margin-bottom: 8px; }
 
 .simpleHead {
   display: flex;
@@ -166,22 +345,20 @@
   gap: 8px;
 }
 
-.simpleTitle {
-  font-weight: 600;
-}
+.simpleTitle { font-weight: 600; }
 
 .simpleMeta {
-  color: var(--muted, #4b5563);
+  color: var(--muted);
   font-size: 12px;
 }
 
-/* ─── skill list ─── */
+/* ─── 技能 ─────────────────────────────────────────────────────── */
 .skillList {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 4px 16px;
 }
 
@@ -192,32 +369,172 @@
   gap: 8px;
 }
 
-.skillName {
-  font-weight: 500;
-}
+.skillName { font-weight: 500; }
 
-.dots {
-  display: inline-flex;
-  gap: 3px;
-}
+.dots { display: inline-flex; gap: 3px; flex: none; }
 
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--border, #d4d8de);
+  background: var(--border);
 }
 
-.dotOn {
-  background: var(--blue, #1e40af);
+.dotOn { background: var(--accent); }
+
+.bars { display: inline-flex; gap: 2px; flex: none; }
+
+.bar {
+  width: 13px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--border);
 }
+
+.barOn { background: var(--accent); }
+
+.skillLevel {
+  color: var(--muted);
+  font-size: 11.5px;
+  flex: none;
+}
+
+.skillTag {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  flex: none;
+  line-height: 1.6;
+}
+
+/* 技能形态变体 */
+.sk_tags .skillItem { justify-content: flex-start; }
+
+.sk_tags .skillName {
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.sk_tags .skillTag { display: none; }
+
+.sk_plain .skillItem { justify-content: space-between; }
+
+.sk_bars .skillName,
+.sk_dots .skillName { font-weight: 500; }
+
+/* ─── 语言 ─────────────────────────────────────────────────────── */
+.langList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.langItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.langName { font-weight: 500; }
 
 .langLevel {
   font-size: 12px;
-  color: var(--muted, #4b5563);
+  color: var(--muted);
 }
 
-/* ─── rich html ─── */
+/* ─── 时间轴 ───────────────────────────────────────────────────── */
+.timeline {
+  position: relative;
+  padding-left: 18px;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: 1.5px;
+  background: var(--border);
+}
+
+.timelineItem {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.timelineNode {
+  position: absolute;
+  left: -18px;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--paper);
+}
+
+/* ─── 项目卡片 ─────────────────────────────────────────────────── */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--paper);
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.cardMeta {
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.cardRole {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--accent);
+}
+
+.cardUrl {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.cardBody {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+/* ─── 富文本 ───────────────────────────────────────────────────── */
 .rich {
   font-size: 13px;
   line-height: 1.7;
@@ -226,6 +543,39 @@
 .rich p { margin: 0 0 4px; }
 .rich p:last-child { margin-bottom: 0; }
 .rich ul, .rich ol { padding-left: 20px; margin: 4px 0; }
-.rich a { color: var(--blue, #1e40af); text-decoration: underline; }
+.rich li { margin-bottom: 2px; }
+.rich a { color: var(--accent); text-decoration: underline; }
 .rich b, .rich strong { font-weight: 600; }
 .rich em, .rich i { font-style: italic; }
+
+/* ─── 存量三套:保持既有外观不变 ───────────────────────────────── */
+/* classic —— 居中标题 + 细线分隔 + 宋体 */
+[data-tpl="classic"] .blockTitle {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+/* modern —— 左侧蓝竖条 + 蓝色标题 */
+[data-tpl="modern"] .name { color: var(--accent); }
+
+[data-tpl="modern"] .blockTitle {
+  color: var(--accent);
+  border-bottom: none;
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+}
+
+/* minimal —— 弱化标题 + 大字距 + 姓名不加粗 */
+[data-tpl="minimal"] .name {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+[data-tpl="minimal"] .blockTitle {
+  border-bottom: none;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}

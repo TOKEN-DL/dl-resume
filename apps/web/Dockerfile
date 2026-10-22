@@ -26,6 +26,8 @@ ENV APP_SECRET="build-placeholder-secret-1234567890"
 ENV SEED_ADMIN_ENABLED="false"
 
 RUN npx prisma generate
+# 字体必须在构建期下载:容器运行时没有网络,且 PDF 导出依赖这些字体文件
+RUN npm run setup:fonts
 RUN npm run build
 
 # ─── runner stage ─────────────────────────────────────────────────

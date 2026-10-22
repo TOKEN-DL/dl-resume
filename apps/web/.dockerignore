@@ -6,6 +6,7 @@ Dockerfile
 
 # Next.js
 .next/
+.next-dev/
 out/
 build/
 
@@ -21,7 +22,8 @@ prisma/migrations/dev.db*
 coverage/
 .nyc_output/
 
-# 字体(运行时 npm run setup-fonts 下载)
+# 字体文件不入构建上下文,Dockerfile 构建期执行 npm run setup:fonts 下载
+# (setup-fonts.ts 本身必须保留在上下文里,否则构建期无法下载)
 public/fonts/*.otf
 public/fonts/*.ttf
 public/fonts/*.woff
@@ -38,5 +40,4 @@ public/fonts/*.woff2
 
 # docs (镜像中不需要)
 README.md
-scripts/setup-fonts.ts
 scripts/e2e-*.js
