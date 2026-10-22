@@ -2,6 +2,7 @@
  * /templates 模板库画廊页 —— 页面外壳样式.
  * 卡片 / 网格 / 筛选条的样式在 components/templates/template-picker.module.css,
  * 因为编辑器里的「换模板」弹层复用同一套 UI。
+ * 顶栏改用全站共享的 components/site-nav/site-nav.module.css。
  */
 
 .shell {
@@ -9,57 +10,6 @@
   flex-direction: column;
   min-height: 100vh;
 }
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px 40px;
-  border-bottom: 1px solid var(--paper-edge);
-  background: var(--paper);
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
-.brandGlyph {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 16px;
-  border-radius: 50%;
-}
-
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 18px;
-  border: 1px solid var(--paper-edge);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-soft);
-  font-family: inherit;
-  font-size: 13px;
-  text-decoration: none;
-  transition: all 160ms;
-}
-.back:hover { border-color: var(--ink); color: var(--ink); }
 
 .main {
   flex: 1;

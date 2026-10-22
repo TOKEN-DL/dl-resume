@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { getTemplate } from "@/lib/templates";
+import { SiteNav } from "@/components/site-nav/site-nav";
 import styles from "./page.module.css";
 
 // 导入面板连带 markdown / pdf / docx 解析器有好几 MB,
@@ -116,12 +117,6 @@ export default function ResumesClient({
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
-
   // ─── JSON Resume 导入/导出 ───────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [importing, setImporting] = useState(false);
@@ -171,53 +166,9 @@ export default function ResumesClient({
     });
   }
 
-  const initial = email.slice(0, 1).toUpperCase();
-
   return (
     <main className={styles.shell}>
-      <header className={styles.topbar}>
-        <div className={styles.brand}>
-          <div className={styles["brand-glyph"]}>简</div>
-          <span>简册</span>
-        </div>
-        <div className={styles["nav-meta"]}>
-          {isAdmin && (
-            <span style={{ color: "var(--amber)" }}>ADMIN</span>
-          )}
-          <span className={styles["user-pill"]}>
-            <span className={styles["user-avatar"]}>{initial}</span>
-            <span>{email}</span>
-          </span>
-          <button
-            onClick={() => router.push("/settings")}
-            style={{
-              padding: "6px 12px",
-              border: "1px solid var(--paper-edge)",
-              borderRadius: 999,
-              background: "transparent",
-              fontSize: 12,
-              cursor: "pointer",
-              color: "var(--ink-soft)",
-            }}
-          >
-            设置
-          </button>
-          <button
-            onClick={logout}
-            style={{
-              padding: "6px 12px",
-              border: "1px solid var(--paper-edge)",
-              borderRadius: 999,
-              background: "transparent",
-              fontSize: 12,
-              cursor: "pointer",
-              color: "var(--ink-soft)",
-            }}
-          >
-            退出
-          </button>
-        </div>
-      </header>
+      <SiteNav email={email} isAdmin={isAdmin} recent={resumes} />
 
       <section className={styles.main}>
         <div className={styles.head}>

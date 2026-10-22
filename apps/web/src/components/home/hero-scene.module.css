@@ -1,0 +1,249 @@
+/**
+ * HeroScene —— 首页 3D 场景样式。
+ *
+ * 整块场景靠三层 3D 上下文叠出来:
+ *   .viewport  提供 perspective(观察者)
+ *   .tilt     跟随鼠标做整体倾斜(preserve-3d)
+ *   .stage    卡片与漂浮标签的 3D 空间(preserve-3d)
+ *
+ * 卡片尺寸全部由 .stage 上的 CSS 变量驱动(卡片宽高、缩放比、卡间距),
+ * 窄屏时在 media query 里改变量即可 —— JS 只负责 3D 变换,不写死像素。
+ */
+
+.scene {
+  position: relative;
+  width: 100%;
+  height: 560px;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  perspective: 1500px;
+  perspective-origin: 50% 42%;
+}
+
+.tilt {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+
+  /* 卡片显示尺寸 / 真实 A4 缩放比 / 相邻卡片间距 */
+  --card-w: 280px;
+  --card-h: 396px;
+  --card-scale: 0.3526;
+  --card-gap: 160px;
+  --stage-x: 62%;
+}
+
+/* ─── 地面网格 ────────────────────────────────────────────────── */
+
+.floor {
+  position: absolute;
+  left: var(--stage-x);
+  top: 44%;
+  width: 1500px;
+  height: 900px;
+  margin-left: -750px;
+  transform: rotateX(76deg);
+  transform-origin: 50% 0%;
+  /* 地面网格是一块巨大的装饰矩形,不接管指针事件 ——
+     否则它会盖住 Hero 文案,首页的「创建简历」按钮点不动。 */
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(30, 64, 175, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30, 64, 175, 0.13) 1px, transparent 1px);
+  background-size: 70px 70px;
+  -webkit-mask-image: radial-gradient(ellipse 58% 58% at 50% 32%, #000 0%, transparent 74%);
+  mask-image: radial-gradient(ellipse 58% 58% at 50% 32%, #000 0%, transparent 74%);
+}
+
+/* ─── 卡片 ────────────────────────────────────────────────────── */
+
+.card {
+  position: absolute;
+  left: var(--stage-x);
+  top: 50%;
+  width: var(--card-w);
+  height: var(--card-h);
+  margin-left: calc(var(--card-w) / -2);
+  margin-top: calc(var(--card-h) / -2);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  /* 装饰性卡片,不接管指针事件 */
+  pointer-events: none;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.08),
+    0 14px 34px rgba(15, 23, 42, 0.12);
+  transition:
+    transform 760ms cubic-bezier(0.2, 0.75, 0.2, 1),
+    opacity 520ms ease,
+    box-shadow 420ms ease;
+  will-change: transform;
+}
+
+.cardCenter {
+  box-shadow:
+    0 4px 10px rgba(15, 23, 42, 0.1),
+    0 32px 74px rgba(15, 23, 42, 0.22);
+}
+
+/* 真实 A4 固定 794px 宽,靠 scale 缩到卡片尺寸 */
+.page {
+  width: 794px;
+  transform: scale(var(--card-scale));
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+/* ─── 漂浮标签 ────────────────────────────────────────────────── */
+
+/*
+ * 位置用 CSS 变量驱动(--cx / --cy / --cz),
+ * 窄屏在 media query 里单独收紧,标签不会飘出画面。
+ */
+.chip {
+  position: absolute;
+  left: var(--stage-x);
+  top: 50%;
+  z-index: 30;
+  pointer-events: none;
+  transform: translate3d(calc(-50% + var(--cx)), calc(-50% + var(--cy)), var(--cz));
+}
+.chip[data-chip="0"] { --cx: -215px; --cy: -150px; --cz: 40px; }
+.chip[data-chip="1"] { --cx: 200px; --cy: -145px; --cz: 20px; }
+.chip[data-chip="2"] { --cx: 205px; --cy: 130px; --cz: -30px; }
+.chip[data-chip="3"] { --cx: -210px; --cy: 145px; --cz: 10px; }
+.chip[data-chip="4"] { --cx: 30px; --cy: -215px; --cz: 60px; }
+
+.chipBody {
+  display: inline-block;
+  padding: 7px 15px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--paper-edge);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  animation: chipFloat 7s ease-in-out infinite;
+}
+@keyframes chipFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+/* ─── 底部说明 ────────────────────────────────────────────────── */
+
+.caption {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 22px;
+  padding: 6px 10px 0;
+}
+.captionText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.captionName {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.captionSummary {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--pencil);
+}
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--pencil-soft);
+  cursor: pointer;
+  transition: all 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.dot:hover {
+  background: var(--pencil);
+}
+.dotActive {
+  width: 24px;
+  background: var(--blue);
+}
+
+@media (max-width: 1024px) {
+  .scene {
+    height: 480px;
+  }
+  .stage {
+    --card-w: 230px;
+    --card-h: 325px;
+    --card-scale: 0.2897;
+    --card-gap: 132px;
+  }
+  .chipBody {
+    font-size: 11px;
+    padding: 6px 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .scene {
+    height: 400px;
+  }
+  .stage {
+    --card-w: 156px;
+    --card-h: 220px;
+    --card-scale: 0.1965;
+    --card-gap: 104px;
+    --stage-x: 58%;
+  }
+  /*
+   * 窄屏放不下 5 个漂浮标签 —— 只留 3 个排成一行,浮在卡片堆上方;
+   * 其余两个直接不渲染,免得一半压在卡片下面像出了 bug。
+   */
+  .chip[data-chip="0"],
+  .chip[data-chip="2"] {
+    display: none;
+  }
+  .chip[data-chip="1"] { --cx: -118px; --cy: -140px; }
+  .chip[data-chip="3"] { --cx: 118px; --cy: -140px; }
+  .chip[data-chip="4"] { --cx: 0px; --cy: -140px; }
+  .chipBody {
+    font-size: 10.5px;
+    padding: 4px 10px;
+  }
+}

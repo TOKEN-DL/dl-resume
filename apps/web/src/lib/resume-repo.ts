@@ -79,6 +79,26 @@ export async function listResumesByUser(userId: string) {
   return rows.map((r) => decrypt(r));
 }
 
+/**
+ * 只取列表元信息(id / 标题 / 模板 / 时间),**不解密正文**。
+ *
+ * 导航栏的「最近编辑」只需要这几列;走 listResumesByUser 会把每份简历的
+ * 密文全部解密一遍,首页这种只要列表的场景纯属浪费。
+ */
+export async function listResumeSummaries(userId: string) {
+  return prisma.resume.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      template: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
 export async function findResumeById(id: string) {
   const row = await prisma.resume.findUnique({ where: { id } });
   return decrypt(row);

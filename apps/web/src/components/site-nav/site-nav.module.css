@@ -1,0 +1,354 @@
+/**
+ * SiteNav 顶栏样式。
+ *
+ * 顶栏在三个入口(/ 首页 / 模板广场 / 我的简历)复用,
+ * 编辑器页保留自己专注的 topbar,不叠加这层。
+ */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 14px 40px;
+  background: rgba(250, 251, 252, 0.86);
+  backdrop-filter: saturate(1.5) blur(14px);
+  -webkit-backdrop-filter: saturate(1.5) blur(14px);
+  border-bottom: 1px solid var(--paper-edge);
+}
+
+/* ─── 品牌 ────────────────────────────────────────────────────── */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  flex: none;
+}
+.glyph {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  transition: transform 340ms cubic-bezier(0.2, 0.7, 0.2, 1), background 200ms;
+}
+.brand:hover .glyph {
+  transform: rotate(-10deg) scale(1.06);
+  background: var(--blue);
+}
+
+/* ─── 主导航 ──────────────────────────────────────────────────── */
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 160ms, background 160ms;
+}
+.link:hover {
+  color: var(--ink);
+  background: var(--paper-deep);
+}
+.linkActive {
+  color: var(--ink);
+  font-weight: 500;
+}
+.linkActive::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 14px;
+  height: 2px;
+  margin-left: -7px;
+  border-radius: 2px;
+  background: var(--blue);
+}
+
+.group {
+  position: relative;
+}
+.trigger {
+  display: inline-flex;
+  align-items: center;
+}
+.caret {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -8px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pencil);
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 160ms, transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.caret:hover {
+  color: var(--ink);
+  background: var(--paper-deep);
+}
+.caretOpen {
+  transform: rotate(180deg);
+  color: var(--ink);
+}
+
+/* ─── 下拉 ────────────────────────────────────────────────────── */
+
+.menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: -6px;
+  width: 306px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--paper-edge);
+  border-radius: 14px;
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.06),
+    0 20px 48px rgba(15, 23, 42, 0.16);
+  z-index: 80;
+  animation: menuIn 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 「创建简历」主 CTA —— 下拉里最显眼的一块 */
+.createBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  transition: background 180ms, transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 180ms;
+}
+.createBtn:hover:not(:disabled) {
+  background: var(--blue);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(30, 64, 175, 0.32);
+}
+.createBtn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.createPlus {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.menuError {
+  margin: 10px 4px 2px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #b91c1c;
+}
+
+.menuLabel {
+  margin: 16px 4px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pencil);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 140ms, color 140ms;
+}
+.menuItem:hover {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+.menuItemText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menuItemMeta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--pencil);
+}
+
+.divider {
+  height: 1px;
+  margin: 10px 2px;
+  background: var(--paper-edge);
+}
+
+/* ─── 右侧账号区 ──────────────────────────────────────────────── */
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+.adminTag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--blue);
+  border: 1px solid var(--blue);
+  border-radius: 4px;
+  padding: 3px 7px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px 5px 5px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 999px;
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink);
+}
+.avatar {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.emailText {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.loginLink {
+  padding: 8px 18px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  text-decoration: none;
+  transition: border-color 160ms, color 160ms;
+}
+.loginLink:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* ─── 响应式 ──────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .bar {
+    padding: 12px 24px;
+    gap: 18px;
+  }
+  .emailText {
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 900px) {
+  /* 窄屏放不下贴着触发的下拉 —— 改成挂在顶栏下方的通栏下拉。
+     .group 退成 static 后,下拉的包含块变成 .bar(sticky 定位元素),
+     于是 top:100% 就是紧贴顶栏下沿,left/right 相对整条顶栏。 */
+  .group {
+    position: static;
+  }
+  .menu {
+    position: absolute;
+    top: 100%;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .bar {
+    padding: 10px 16px;
+    gap: 12px;
+  }
+  .word {
+    display: none;
+  }
+  .link {
+    padding: 7px 9px;
+    font-size: 13px;
+  }
+  .emailText {
+    display: none;
+  }
+  .pill {
+    padding: 4px;
+  }
+}

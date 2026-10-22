@@ -1,27 +1,35 @@
 /**
  * /templates —— 模板库画廊页。
  *
- * Server: 只负责页面外壳(标题 + 返回按钮),画廊本体是 Client Component。
+ * Server: 只负责页面外壳(顶栏 + 标题),画廊本体是 Client Component。
+ * 顶栏用全站共享的 SiteNav,账号信息从 session 取。
  */
-import Link from "next/link";
 import { GalleryClient } from "./gallery-client";
 import { TEMPLATES } from "@/lib/templates";
+import { getSession } from "@/lib/session";
+import { listResumeSummaries } from "@/lib/resume-repo";
+import { SiteNav } from "@/components/site-nav/site-nav";
 import styles from "./page.module.css";
 
-export const dynamic = "force-dynamic"; // 模板库每次都取最新注册表
+export const dynamic = "force-dynamic"; // 模板库每次都取最新注册表 + session
 
-export default function TemplatesPage() {
+export default async function TemplatesPage() {
+  const session = await getSession();
+  const recent = session
+    ? (await listResumeSummaries(session.sub)).slice(0, 5).map((r) => ({
+        id: r.id,
+        title: r.title,
+        updatedAt: r.updatedAt.toISOString(),
+      }))
+    : [];
+
   return (
     <main className={styles.shell}>
-      <header className={styles.topbar}>
-        <div className={styles.brand}>
-          <div className={styles.brandGlyph}>简</div>
-          <span>简册</span>
-        </div>
-        <Link className={styles.back} href="/resumes">
-          ← 返回简历列表
-        </Link>
-      </header>
+      <SiteNav
+        email={session?.email ?? null}
+        isAdmin={session?.isAdmin}
+        recent={recent}
+      />
 
       <section className={styles.main}>
         <div className={styles.head}>
