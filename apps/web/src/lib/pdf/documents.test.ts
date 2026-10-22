@@ -1,12 +1,13 @@
 /**
  * PDF 生成 smoke tests.
  *
- * 用 pdf-lib 解析生成结果,验证:
+ * 用 pdf-lib / pdfjs 解析生成结果,验证:
  *  - magic header "%PDF-"
  *  - 至少 1 页
- *  - 文件大小合理(>5KB,<2MB)
+ *  - 文件大小合理
  *  - 标题 metadata 反映 resume.basics.name
- *  - 中文字符能落到 content stream 中(粗略验证:buffer 含中文字节)
+ *  - 中文字符能落到 content stream 中(必须走 pdfjs 的 CMap 解码)
+ *  - 32 套模板全部能生成可解析的 PDF
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { PDFDocument } from "pdf-lib";
@@ -15,6 +16,9 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { ResumeDocument } from "./documents";
 import type { ResumeData } from "@/lib/validation/resume";
 import { registerFontsOnce } from "./font";
+import { TEMPLATES } from "@/lib/templates/registry";
+import { SAMPLE_PROFESSIONAL } from "@/lib/templates/samples";
+import type { TextItem, TextMarkedContent } from "pdfjs-dist/types/src/display/api";
 
 const sampleData: ResumeData = {
   basics: {
@@ -76,7 +80,7 @@ const sampleData: ResumeData = {
   interests: "阅读 / 跑步 / 桌游",
 };
 
-async function generate(data: ResumeData, template: "classic" | "modern" | "minimal"): Promise<Buffer> {
+async function generate(data: ResumeData, template: string): Promise<Buffer> {
   await registerFontsOnce();
   return renderToBuffer(ResumeDocument({ data, template }));
 }
@@ -94,9 +98,19 @@ async function extractText(buf: Buffer): Promise<string> {
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i);
     const tc = await page.getTextContent();
-    all += tc.items.map((it: any) => it.str).join("") + "\n";
+    // pdfjs 的 items 是 TextItem | TextMarkedContent 联合,只有 TextItem 有 .str。
+    all += tc.items
+      .map((it: TextItem | TextMarkedContent) =>
+        "str" in it ? (it as TextItem).str : "",
+      )
+      .join("") + "\n";
   }
   return all;
+}
+
+/** 缺字形会渲染成 .notdef,这里用替换符 / 私用区字符兜底检测 */
+function hasMissingGlyph(text: string): boolean {
+  return /[\uFFFD\uE000-\uF8FF]|�/.test(text);
 }
 
 describe("ResumeDocument — PDF generation", () => {
@@ -159,6 +173,7 @@ describe("ResumeDocument — PDF generation", () => {
     expect(text).not.toContain("📞");
     expect(text).not.toContain("📍");
     expect(text).not.toMatch(/[=\uFFF0-\uFFFF]/);
+    expect(hasMissingGlyph(text)).toBe(false);
   });
 
   it("empty resume renders without crashing", async () => {
@@ -197,5 +212,75 @@ describe("ResumeDocument — PDF generation", () => {
     expect(text).toContain("字节跳动");
     expect(text).toContain("第一项");
     expect(text).toContain("第二项");
+  });
+
+  it("未知模板 id 回退 classic,不抛错", async () => {
+    const buf = await generate(sampleData, "not-a-real-template");
+    expect(buf.subarray(0, 5).toString()).toBe("%PDF-");
+    const doc = await PDFDocument.load(buf);
+    expect(doc.getPages().length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("全部 32 套模板都能生成可解析的 PDF", async () => {
+    expect(TEMPLATES.length).toBe(32);
+    for (const def of TEMPLATES) {
+      const buf = await generate(SAMPLE_PROFESSIONAL, def.id);
+      expect(buf.length, def.id).toBeGreaterThan(1000);
+      expect(buf.subarray(0, 5).toString(), def.id).toBe("%PDF-");
+      const doc = await PDFDocument.load(buf);
+      expect(doc.getPageCount(), def.id).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("不同骨架的模板都能解出范文里的中文姓名", async () => {
+    // 覆盖 7 种骨架各挑一套
+    const picked = [
+      "classic", // single-classic
+      "modern", // single-modern
+      "navy-elegant", // sidebar-left
+      "luxury-dark", // sidebar-right
+      "blue-corporate", // two-column
+      "timeline-style", // timeline
+      "designer", // card-grid
+    ];
+    for (const id of picked) {
+      const buf = await generate(SAMPLE_PROFESSIONAL, id);
+      const text = await extractText(buf);
+      expect(text, id).toContain("陈默");
+      expect(text, id).toContain("星云科技");
+      expect(hasMissingGlyph(text), id).toBe(false);
+    }
+  });
+
+  it("技能形态随 theme.skill 变化", async () => {
+    // dots → ● / ○;bars → ▇ / ▁;tags → [名称];plain → 等级中文
+    const dots = await extractText(await generate(SAMPLE_PROFESSIONAL, "classic"));
+    expect(dots).toContain("●");
+    const bars = await extractText(await generate(SAMPLE_PROFESSIONAL, "gray-underline"));
+    expect(bars).toContain("▇");
+    const tags = await extractText(await generate(SAMPLE_PROFESSIONAL, "tech-gradient"));
+    expect(tags).toContain("[React / Next.js]");
+    const plain = await extractText(await generate(SAMPLE_PROFESSIONAL, "pure-minimal"));
+    expect(plain).toContain("精通");
+  });
+
+  it("序号式标题带两位章节序号", async () => {
+    const text = await extractText(await generate(SAMPLE_PROFESSIONAL, "code-style"));
+    expect(text).toContain("01 ");
+  });
+
+  it("有头像时渲染图片,不崩溃", async () => {
+    // 1x1 透明 PNG
+    const png =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const data: ResumeData = {
+      ...SAMPLE_PROFESSIONAL,
+      basics: { ...SAMPLE_PROFESSIONAL.basics, avatar: png },
+    };
+    // navy-elegant 是 circle 头像 + 侧栏骨架
+    const buf = await generate(data, "navy-elegant");
+    expect(buf.subarray(0, 5).toString()).toBe("%PDF-");
+    const doc = await PDFDocument.load(buf);
+    expect(doc.getPageCount()).toBeGreaterThanOrEqual(1);
   });
 });

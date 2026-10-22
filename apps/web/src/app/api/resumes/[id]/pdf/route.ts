@@ -4,15 +4,14 @@
  */
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { assertOwnership } from "@/lib/resume-repo";
+import { assertOwnership, errorMessage, type ResumeDecrypted } from "@/lib/resume-repo";
 import { parseResumeData } from "@/lib/validation/resume";
 import { registerFontsOnce } from "@/lib/pdf/font";
-import { ResumeDocument, type TemplateId } from "@/lib/pdf/documents";
+import { ResumeDocument } from "@/lib/pdf/documents";
+import { getTemplate } from "@/lib/templates";
 
 export const runtime = "nodejs"; // 需要文件系统访问字体
 export const dynamic = "force-dynamic";
-
-const TEMPLATES: TemplateId[] = ["classic", "modern", "minimal"];
 
 export async function GET(
   _req: Request,
@@ -23,22 +22,30 @@ export async function GET(
 
   const { id } = await params;
   // 必须走 assertOwnership — 它内部会解密(F18),不要绕过 repo 直接查 prisma
-  let resume;
+  let resume: ResumeDecrypted;
   try {
     resume = await assertOwnership(id, session.sub);
-  } catch (e: any) {
-    const msg = e?.message ?? "";
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
     if (msg === "Forbidden") return NextResponse.json({ error: "forbidden" }, { status: 403 });
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const template: TemplateId = (TEMPLATES as string[]).includes(resume.template)
-    ? (resume.template as TemplateId)
-    : "classic";
+  // 模板 id 来自注册表;未知 id 自动回退到 classic(与预览端行为一致)
+  const template = getTemplate(resume.template).id;
   const data = parseResumeData(resume.data);
 
   // 注册字体(memoized,只跑一次)
-  await registerFontsOnce();
+  try {
+    await registerFontsOnce();
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    console.error("[pdf] font registration failed", e);
+    return NextResponse.json(
+      { error: "font_unavailable", message: msg || "字体资源缺失,请运行 npm run setup:fonts" },
+      { status: 500 },
+    );
+  }
 
   let buffer: Buffer;
   try {
@@ -47,10 +54,10 @@ export async function GET(
     buffer = await renderToBuffer(
       ResumeDocument({ data, template }),
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("[pdf] render failed", e);
     return NextResponse.json(
-      { error: "render_failed", message: e?.message ?? String(e) },
+      { error: "render_failed", message: errorMessage(e) || String(e) },
       { status: 500 },
     );
   }

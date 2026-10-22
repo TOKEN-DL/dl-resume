@@ -162,12 +162,17 @@
 .av_circle { border-radius: 50%; }
 .av_square { border-radius: 0; }
 .av_rounded { border-radius: 12px; }
+.av_none { /* 不渲染头像 */ }
 
 .name {
   margin: 0;
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 1px;
+}
+
+.nm_plain .name {
+  /* 默认样式:无额外装饰 */
 }
 
 .nm_underline .name {

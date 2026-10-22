@@ -31,17 +31,8 @@
 .thumbPlaceholder {
   width: 100%;
   height: 100%;
-  background:
-    linear-gradient(100deg, var(--paper-deep) 28%, #fff 50%, var(--paper-deep) 72%)
-    0 0 / 220% 100%;
-  animation: thumbShimmer 1.6s linear infinite;
-}
-@keyframes thumbShimmer {
-  from { background-position: 160% 0; }
-  to { background-position: -60% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .thumbPlaceholder { animation: none; }
+  background: var(--paper-deep, #f1f5f9);
+  /* 不用无限动画:几十个同时跑的渐变动画 + 真实 A4 渲染会把主线程压垮 */
 }
 
 /* ─── 筛选条 ───────────────────────────────────────────────────────── */
