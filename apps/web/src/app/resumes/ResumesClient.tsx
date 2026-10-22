@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, FormEvent } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { getTemplate } from "@/lib/templates";
+import { parseResumeData, type ResumeData } from "@/lib/validation/resume";
 import { SiteNav } from "@/components/site-nav/site-nav";
+import { TemplateThumb } from "@/components/templates/template-thumb";
 import styles from "./page.module.css";
 
 // 导入面板连带 markdown / pdf / docx 解析器有好几 MB,
@@ -20,6 +22,8 @@ interface Resume {
   template: string;
   updatedAt: string;
   createdAt: string;
+  /** 简历正文 —— 卡片缩略图渲染的就是它 */
+  data?: ResumeData;
 }
 
 /** 模板名从注册表派生;未知 id 兜底显示原始 id,便于排查脏数据 */
@@ -57,7 +61,13 @@ export default function ResumesClient({
     const r = await fetch("/api/resumes", { cache: "no-store" });
     if (r.ok) {
       const { resumes: list } = await r.json();
-      setResumes(list);
+      // 接口里的 data 是 JSON 字符串,这里解析成对象供缩略图渲染
+      setResumes(
+        (list as Array<Resume & { data?: string }>).map((x) => ({
+          ...x,
+          data: parseResumeData(x.data),
+        })),
+      );
     }
   }
 
@@ -235,7 +245,7 @@ export default function ResumesClient({
           </div>
         ) : (
           <div className={styles.grid}>
-            {resumes.map((r) => (
+            {resumes.map((r, i) => (
               <article
                 key={r.id}
                 className={styles.card}
@@ -263,15 +273,13 @@ export default function ResumesClient({
                     onClick={(e) => { e.stopPropagation(); setDeleting(r); }}
                   >×</button>
                 </div>
+                {/* 缩略图 = 这份简历用它的模板渲染出来的真实 A4 */}
                 <div className={styles.thumb}>
-                  <div className={styles["thumb-doc"]}>
-                    <div className="td-name">{r.title.slice(0, 10)}</div>
-                    <div className="td-line"></div>
-                    <div className="td-row"><div className="b"></div><div className="s"></div></div>
-                    <div className="td-row"><div className="g"></div><div className="g"></div></div>
-                    <div className="td-line"></div>
-                    <div className="td-row"><div className="b"></div></div>
-                  </div>
+                  <TemplateThumb
+                    def={getTemplate(r.template)}
+                    data={r.data}
+                    lazy={i >= 4}
+                  />
                 </div>
                 <div className={styles["card-meta"]}>
                   <div>

@@ -5,6 +5,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { listResumesByUser } from "@/lib/resume-repo";
+import { parseResumeData } from "@/lib/validation/resume";
 import ResumesClient from "./ResumesClient";
 
 export const dynamic = "force-dynamic"; // 每次都拉最新列表
@@ -23,6 +24,8 @@ export default async function ResumesPage() {
     template: r.template,
     updatedAt: r.updatedAt.toISOString(),
     createdAt: r.createdAt.toISOString(),
+    // 卡片里的缩略图要渲染这份简历本身,所以正文一起传给客户端
+    data: parseResumeData(r.data),
   }));
 
   return (

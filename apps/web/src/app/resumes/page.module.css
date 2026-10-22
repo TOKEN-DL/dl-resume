@@ -75,7 +75,8 @@
   background: #fff;
   border: 1px solid var(--paper-edge);
   border-radius: 4px;
-  padding: 24px;
+  /* 上内边距去掉 —— 缩略图要顶到卡片上沿,和模板画廊的卡片一致 */
+  padding: 0 24px 24px;
   min-height: 220px;
   cursor: pointer;
   transition: all 280ms cubic-bezier(.2,.7,.2,1);
@@ -89,11 +90,11 @@
 .card::before {
   content: "";
   position: absolute;
-  top: 0;
+  bottom: 0;
   right: 0;
   width: 64px;
   height: 64px;
-  background: linear-gradient(225deg, var(--paper-edge) 0%, transparent 60%);
+  background: linear-gradient(315deg, var(--paper-edge) 0%, transparent 60%);
   opacity: 0.5;
 }
 .card:hover {
@@ -102,35 +103,17 @@
   border-color: var(--ink);
 }
 
+/* 真实简历缩略图 —— 卡片里渲染的就是这份简历本身 */
 .thumb {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--paper);
-  margin: -10px -10px 16px;
-  padding: 14px;
+  margin: 0 -24px 18px;
+  background: var(--paper-deep);
   border-bottom: 1px solid var(--paper-edge);
+  overflow: hidden;
 }
-.thumb-doc {
-  position: relative;
-  z-index: 1;
-  width: 88px;
-  height: 110px;
-  background: #fff;
-  border: 1px solid var(--paper-edge);
-  padding: 6px 5px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 4px;
+/* 缩略图自带的下边框会跟卡片的上边框打架,去掉 */
+.thumb > div {
+  border-bottom: none;
 }
-.thumb-doc .td-name { font-weight: 700; font-size: 5px; margin-bottom: 1px; }
-.thumb-doc .td-line { height: 1px; background: var(--ink); margin: 2px 0; opacity: 0.7; }
-.thumb-doc .td-row { display: flex; gap: 2px; align-items: center; }
-.thumb-doc .td-row .b { height: 4px; background: var(--ink); opacity: 0.8; flex: 1; }
-.thumb-doc .td-row .s { height: 4px; background: var(--ink); opacity: 0.4; flex: 0.6; }
-.thumb-doc .td-row .g { height: 2px; background: var(--ink); opacity: 0.4; flex: 1; }
 
 .card-meta { display: flex; align-items: center; justify-content: space-between; }
 .card-title {
@@ -191,6 +174,7 @@
 .card-new {
   border-style: dashed;
   background: transparent;
+  padding: 24px;
   align-items: center;
   justify-content: center;
   text-align: center;
