@@ -9,6 +9,7 @@ import { getSession } from "@/lib/session";
 import {
   assertOwnership,
   deleteResume,
+  errorMessage,
   updateResume,
 } from "@/lib/resume-repo";
 import { isTemplateId } from "@/lib/templates";
@@ -44,8 +45,8 @@ export async function PATCH(
 
   try {
     await assertOwnership(id, session.sub);
-  } catch (e: any) {
-    const msg = e?.message ?? "";
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
     if (msg === "Forbidden") return NextResponse.json({ error: "forbidden" }, { status: 403 });
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
@@ -93,8 +94,8 @@ export async function DELETE(
 
   try {
     await assertOwnership(id, session.sub);
-  } catch (e: any) {
-    const msg = e?.message ?? "";
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
     if (msg === "Forbidden") return NextResponse.json({ error: "forbidden" }, { status: 403 });
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }

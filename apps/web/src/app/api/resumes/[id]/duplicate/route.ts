@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { assertOwnership, duplicateResume } from "@/lib/resume-repo";
+import { assertOwnership, duplicateResume, errorMessage } from "@/lib/resume-repo";
 
 export async function POST(
   _req: Request,
@@ -17,8 +17,8 @@ export async function POST(
 
   try {
     await assertOwnership(id, session.sub);
-  } catch (e: any) {
-    const msg = e?.message ?? "";
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
     if (msg === "Forbidden") return NextResponse.json({ error: "forbidden" }, { status: 403 });
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }

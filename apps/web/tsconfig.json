@@ -22,7 +22,9 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next-dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  // scripts/_* 是一次性排查脚本(不进仓库),不能让它们挡住类型门禁
+  "exclude": ["node_modules", "scripts/_*"]
 }

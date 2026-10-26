@@ -3,30 +3,47 @@
  * TDD: write tests first, then make them pass.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Prisma } from "@prisma/client";
+
+interface UserRow {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  isAdmin: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 // In-memory mock store keyed by email
-const store = new Map<string, { id: string; email: string; passwordHash: string; name: string; isAdmin: boolean; createdAt: Date; updatedAt: Date }>();
+const store = new Map<string, UserRow>();
+
+const prismaUniqueViolation = (): Error & { code: "P2002" } => {
+  const err = new Error("Unique constraint") as Error & { code: "P2002" };
+  err.code = "P2002";
+  return err;
+};
 
 vi.mock("./prisma", () => ({
   prisma: {
     user: {
-      findUnique: vi.fn(async ({ where: { email } }: any) => store.get(email) ?? null),
-      create: vi.fn(async ({ data }: any) => {
-        if (store.has(data.email)) {
-          const err: any = new Error("Unique constraint");
-          err.code = "P2002";
-          throw err;
-        }
-        const row = {
+      findUnique: vi.fn(async (args: Prisma.UserFindUniqueArgs) => {
+        const email = (args.where as { email: string }).email;
+        return store.get(email) ?? null;
+      }),
+      create: vi.fn(async (args: Prisma.UserCreateArgs) => {
+        const d = args.data as Omit<UserRow, "id" | "createdAt" | "updatedAt">;
+        if (store.has(d.email)) throw prismaUniqueViolation();
+        const row: UserRow = {
           id: "u_" + Math.random().toString(36).slice(2, 10),
-          email: data.email,
-          passwordHash: data.passwordHash,
-          name: data.name,
-          isAdmin: data.isAdmin ?? false,
+          email: d.email,
+          passwordHash: d.passwordHash,
+          name: d.name,
+          isAdmin: d.isAdmin ?? false,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-        store.set(data.email, row);
+        store.set(d.email, row);
         return row;
       }),
     },

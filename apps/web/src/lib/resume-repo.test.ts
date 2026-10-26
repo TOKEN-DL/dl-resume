@@ -3,6 +3,7 @@
  * TDD: write tests first, then make them pass.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Prisma } from "@prisma/client";
 
 interface ResumeRow {
   id: string;
@@ -19,10 +20,22 @@ const store = new Map<string, ResumeRow>();
 let idSeq = 1;
 const newId = () => "r_" + (idSeq++).toString().padStart(4, "0");
 
+/** 复刻 Prisma 的 "not found" 错误对象 —— 比 P2025 字面值更紧凑 */
+const prismaNotFound = (): Error & { code: "P2025" } => {
+  const err = new Error("Not found") as Error & { code: "P2025" };
+  err.code = "P2025";
+  return err;
+};
+
 vi.mock("./prisma", () => ({
   prisma: {
     resume: {
-      findMany: vi.fn(async ({ where, orderBy }: any) => {
+      // 这里只关心 mock 实现本身,类型用 Prisma 的正经 args 套在签名上,
+      // 真实 prisma client 会被 vitest 自动按这些 args 形状校验调用方。
+      // mock 实现内部把 Args 解构成自己看得懂的形状跑测试即可。
+      findMany: vi.fn(async (args: Prisma.ResumeFindManyArgs) => {
+        const where = args.where as { userId?: string } | undefined;
+        const orderBy = args.orderBy as { updatedAt?: "asc" | "desc" } | undefined;
         const all = Array.from(store.values()).filter(
           (r) => !where?.userId || r.userId === where.userId,
         );
@@ -31,38 +44,37 @@ vi.mock("./prisma", () => ({
         }
         return all;
       }),
-      findUnique: vi.fn(async ({ where: { id } }: any) => store.get(id) ?? null),
-      create: vi.fn(async ({ data }: any) => {
+      findUnique: vi.fn(async (args: Prisma.ResumeFindUniqueArgs) => {
+        const id = (args.where as { id: string }).id;
+        return store.get(id) ?? null;
+      }),
+      create: vi.fn(async (args: Prisma.ResumeCreateArgs) => {
+        const d = args.data as Omit<ResumeRow, "id" | "createdAt" | "updatedAt">;
         const row: ResumeRow = {
           id: newId(),
-          userId: data.userId,
-          title: data.title,
-          template: data.template ?? "classic",
-          data: data.data ?? "{}",
+          userId: d.userId,
+          title: d.title,
+          template: d.template ?? "classic",
+          data: d.data ?? "{}",
           createdAt: new Date(),
           updatedAt: new Date(),
         };
         store.set(row.id, row);
         return row;
       }),
-      update: vi.fn(async ({ where: { id }, data }: any) => {
+      update: vi.fn(async (args: Prisma.ResumeUpdateArgs) => {
+        const id = (args.where as { id: string }).id;
         const row = store.get(id);
-        if (!row) {
-          const err: any = new Error("Not found");
-          err.code = "P2025";
-          throw err;
-        }
-        const next = { ...row, ...data, updatedAt: new Date() };
+        if (!row) throw prismaNotFound();
+        const patch = args.data as Partial<Omit<ResumeRow, "id" | "createdAt" | "updatedAt">>;
+        const next: ResumeRow = { ...row, ...patch, updatedAt: new Date() };
         store.set(id, next);
         return next;
       }),
-      delete: vi.fn(async ({ where: { id } }: any) => {
+      delete: vi.fn(async (args: Prisma.ResumeDeleteArgs) => {
+        const id = (args.where as { id: string }).id;
         const row = store.get(id);
-        if (!row) {
-          const err: any = new Error("Not found");
-          err.code = "P2025";
-          throw err;
-        }
+        if (!row) throw prismaNotFound();
         store.delete(id);
         return row;
       }),

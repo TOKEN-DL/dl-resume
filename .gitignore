@@ -4,6 +4,7 @@ node_modules/
 
 # Build outputs
 .next/
+.next-dev/
 out/
 dist/
 build/
@@ -51,7 +52,16 @@ coverage/
 # Temp / scratch
 .tmp/
 .tmp-*/
+.tmp-*
+.git-commit-msg.txt
 tools-scaffold/
+lint-out.txt
+verify-*.pdf
+
+# 一次性调试脚本(前缀 _ 的是本地排查用的,不进仓库)
+apps/web/scripts/_*.js
+apps/web/scripts/_*.cjs
+apps/web/scripts/_*.ts
 
 # Prototype artifacts (single-file HTML demo; local-only, double-click to view)
 prototype/

@@ -141,10 +141,7 @@ export const ResumeDataSchema = z.object({
 });
 export type ResumeData = z.infer<typeof ResumeDataSchema>;
 
-/**
- * 解析 + 校验 + 兜底默认值.失败时回落到空模板而不抛错,
- * 这样旧版本数据可平滑迁移。
- */
+/** 全空模板 — 新建简历的初始值,也是 JSON 彻底损坏时的兜底 */
 export const EMPTY_RESUME_DATA: ResumeData = {
   basics: {
     name: "",
@@ -167,16 +164,165 @@ export const EMPTY_RESUME_DATA: ResumeData = {
   interests: "",
 };
 
+/**
+ * 尽力修复:把任意形状的对象修成符合 ResumeDataSchema 的结构。
+ *
+ * 为什么需要它 —— 早期实现里校验失败直接返回空模板,后果是:
+ * 用户在表单里把邮箱清空 → 自动保存写入 JSON → 下次打开走 parseResumeData
+ * → 整份简历变成空白,而且没有任何报错。这属于静默丢数据。
+ *
+ * 策略:能救的字段全救(强转类型、截断超长、过滤坏条目),
+ * 只对真正非法的枚举值退回默认值。
+ */
+export function repairResumeData(obj: unknown): ResumeData {
+  const root = (obj && typeof obj === "object" ? obj : {}) as Record<string, unknown>;
+  const b = (root.basics && typeof root.basics === "object" ? root.basics : {}) as Record<string, unknown>;
+
+  const str = (v: unknown, max: number): string => {
+    if (typeof v === "string") return v.slice(0, max);
+    if (typeof v === "number" && Number.isFinite(v)) return String(v).slice(0, max);
+    if (typeof v === "boolean") return String(v).slice(0, max);
+    return "";
+  };
+
+  const period = (v: unknown) => {
+    const p = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+    const norm = (x: unknown) => {
+      const s = str(x, 20);
+      return /^\d{4}(-\d{2})?(-\d{2})?$/.test(s) ? s : "";
+    };
+    return { start: norm(p.start), end: norm(p.end), current: p.current === true };
+  };
+
+  /** 取数组;逐条修复后丢弃"主字段为空"的条目 */
+  const list = <T,>(v: unknown, limit: number, fix: (raw: Record<string, unknown>, i: number) => T | null): T[] => {
+    if (!Array.isArray(v)) return [];
+    const out: T[] = [];
+    for (let i = 0; i < v.length && out.length < limit; i++) {
+      const raw = v[i];
+      if (!raw || typeof raw !== "object") continue;
+      const item = fix(raw as Record<string, unknown>, i);
+      if (item) out.push(item);
+    }
+    return out;
+  };
+
+  const withId = (raw: Record<string, unknown>, i: number, prefix: string) =>
+    str(raw.id, 40) || `${prefix}_r${i}`;
+
+  const genderRaw = str(b.gender, 10);
+  const gender = (["male", "female", "other", ""] as const).find((g) => g === genderRaw) ?? "";
+
+  const SKILL_LEVELS = ["beginner", "intermediate", "advanced", "expert"] as const;
+  const LANG_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "native", ""] as const;
+
+  return {
+    basics: {
+      name: str(b.name, 60),
+      label: str(b.label, 80),
+      email: str(b.email, 120),
+      phone: str(b.phone, 40),
+      gender: gender as "" | "male" | "female" | "other",
+      location: str(b.location, 80),
+      avatar: str(b.avatar, 200_000),
+      summary: str(b.summary, 200),
+    },
+    summary: str(root.summary, 50_000),
+    education: list(root.education, 100, (raw, i) => {
+      const school = str(raw.school, 80).trim();
+      if (!school) return null;
+      return {
+        id: withId(raw, i, "e"),
+        school,
+        degree: str(raw.degree, 40),
+        major: str(raw.major, 60),
+        period: period(raw.period),
+        description: str(raw.description, 50_000),
+      };
+    }),
+    work: list(root.work, 100, (raw, i) => {
+      const company = str(raw.company, 80).trim();
+      if (!company) return null;
+      return {
+        id: withId(raw, i, "w"),
+        company,
+        position: str(raw.position, 60),
+        period: period(raw.period),
+        description: str(raw.description, 50_000),
+      };
+    }),
+    projects: list(root.projects, 100, (raw, i) => {
+      const name = str(raw.name, 80).trim();
+      if (!name) return null;
+      return {
+        id: withId(raw, i, "p"),
+        name,
+        role: str(raw.role, 60),
+        period: period(raw.period),
+        url: str(raw.url, 500),
+        description: str(raw.description, 50_000),
+      };
+    }),
+    skills: list(root.skills, 200, (raw, i) => {
+      const name = str(raw.name, 40).trim();
+      if (!name) return null;
+      const level = str(raw.level, 20) as (typeof SKILL_LEVELS)[number];
+      return {
+        id: withId(raw, i, "s"),
+        name,
+        level: SKILL_LEVELS.includes(level) ? level : "intermediate",
+      };
+    }),
+    languages: list(root.languages, 50, (raw, i) => {
+      const name = str(raw.name, 40).trim();
+      if (!name) return null;
+      const level = str(raw.level, 10) as (typeof LANG_LEVELS)[number];
+      return { id: withId(raw, i, "l"), name, level: LANG_LEVELS.includes(level) ? level : "" };
+    }),
+    awards: list(root.awards, 100, (raw, i) => {
+      const title = str(raw.title, 80).trim();
+      if (!title) return null;
+      return {
+        id: withId(raw, i, "a"),
+        title,
+        awarder: str(raw.awarder, 80),
+        date: str(raw.date, 20),
+        description: str(raw.description, 500),
+      };
+    }),
+    certificates: list(root.certificates, 100, (raw, i) => {
+      const name = str(raw.name, 80).trim();
+      if (!name) return null;
+      return {
+        id: withId(raw, i, "c"),
+        name,
+        issuer: str(raw.issuer, 80),
+        date: str(raw.date, 20),
+      };
+    }),
+    interests: str(root.interests, 1000),
+  };
+}
+
+/**
+ * 解析 + 校验 + 兜底默认值.
+ *
+ * JSON 本身坏掉才返回空模板;结构对不上则走 repairResumeData 抢救,
+ * 避免"一个字段非法 → 整份简历变空白"的静默数据丢失。
+ */
 export function parseResumeData(raw: string | null | undefined): ResumeData {
   if (!raw) return structuredClone(EMPTY_RESUME_DATA);
+
+  let obj: unknown;
   try {
-    const obj = JSON.parse(raw);
-    const parsed = ResumeDataSchema.safeParse(obj);
-    if (parsed.success) return parsed.data;
-    return structuredClone(EMPTY_RESUME_DATA);
+    obj = JSON.parse(raw);
   } catch {
     return structuredClone(EMPTY_RESUME_DATA);
   }
+
+  const parsed = ResumeDataSchema.safeParse(obj);
+  if (parsed.success) return parsed.data;
+  return repairResumeData(obj);
 }
 
 export function safeStringify(data: ResumeData): string {

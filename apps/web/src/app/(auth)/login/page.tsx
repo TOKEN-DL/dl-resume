@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "../auth.module.css";
 
+// Next.js 15 在静态预渲染时要求 useSearchParams() 必须包在 Suspense 边界里;
+// 外层保稳定 fallback,内层才是真正读 search params 的客户端组件。
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get("next") || "/resumes";

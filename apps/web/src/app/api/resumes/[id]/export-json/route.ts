@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { assertOwnership } from "@/lib/resume-repo";
+import { assertOwnership, errorMessage, type ResumeDecrypted } from "@/lib/resume-repo";
 import { parseResumeData } from "@/lib/validation/resume";
 import { exportJsonResume } from "@/lib/jsonresume/mapping";
 
@@ -20,11 +20,11 @@ export async function GET(
 
   const { id } = await params;
   // 必须走 assertOwnership — 它内部会解密(F18),不要绕过 repo 直接查 prisma
-  let resume;
+  let resume: ResumeDecrypted;
   try {
     resume = await assertOwnership(id, session.sub);
-  } catch (e: any) {
-    const msg = e?.message ?? "";
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
     if (msg === "Forbidden") return NextResponse.json({ error: "forbidden" }, { status: 403 });
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }

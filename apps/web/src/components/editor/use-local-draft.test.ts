@@ -13,13 +13,23 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto"; // 必须在任何 idb-keyval import 之前
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { Mock } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { get, set as idbSet, del as idbDel } from "idb-keyval";
 import { useLocalDraft } from "./use-local-draft";
+import type { ResumeData } from "@/lib/validation/resume";
 
 const KEY = "resume:r1";
 const now = () => Date.now();
 const DAY = 24 * 60 * 60 * 1000;
+
+/** IndexedDB 里草稿对象的本地副本 —— use-local-draft.ts 的 DraftMeta 没导出 */
+interface DraftMeta {
+  data: ResumeData;
+  title?: string;
+  template?: string;
+  updatedAt: number;
+}
 
 /** 清空所有 resume:* 草稿 */
 async function clearDrafts() {
@@ -27,12 +37,15 @@ async function clearDrafts() {
   await idbDel(KEY).catch(() => {});
 }
 
-const baseProps = (over: any = {}) => ({
+type PersistPayload = { data: ResumeData; title?: string; template?: string };
+type PersistFn = (payload: PersistPayload) => Promise<void>;
+
+const baseProps = (over: Partial<Parameters<typeof useLocalDraft>[0]> = {}) => ({
   resumeId: "r1",
-  initialData: { basics: { name: "服务端内容" } } as any,
+  initialData: { basics: { name: "服务端内容" } } as unknown as ResumeData,
   initialTitle: "服务端标题",
   initialTemplate: "classic",
-  onPersist: vi.fn(async () => {}),
+  onPersist: vi.fn<PersistFn>(async () => {}),
   ...over,
 });
 
@@ -48,21 +61,21 @@ afterEach(async () => {
 
 describe("useLocalDraft — flush 链路", () => {
   it("初始状态 idle,不触发保存", async () => {
-    const onPersist = vi.fn(async () => {});
+    const onPersist: Mock<PersistFn> = vi.fn<PersistFn>(async () => {});
     const { result } = renderHook(() => useLocalDraft(baseProps({ onPersist })));
     expect(result.current.saveState).toBe("idle");
     expect(onPersist).not.toHaveBeenCalled();
   });
 
   it("无改动时 flush 不发请求", async () => {
-    const onPersist = vi.fn(async () => {});
+    const onPersist: Mock<PersistFn> = vi.fn<PersistFn>(async () => {});
     const { result } = renderHook(() => useLocalDraft(baseProps({ onPersist })));
     await act(async () => { await result.current.flush(); });
     expect(onPersist).not.toHaveBeenCalled();
   });
 
   it("改动后 flush 发送完整快照并标记 saved", async () => {
-    const onPersist = vi.fn(async () => {});
+    const onPersist: Mock<PersistFn> = vi.fn<PersistFn>(async () => {});
     const { result } = renderHook(() => useLocalDraft(baseProps({ onPersist })));
 
     act(() => { result.current.setTitle("新标题"); });
@@ -71,8 +84,8 @@ describe("useLocalDraft — flush 链路", () => {
     await act(async () => { await result.current.flush(); });
 
     expect(onPersist).toHaveBeenCalledTimes(1);
-    const payload = (onPersist.mock.calls as any)[0][0];
-    expect(payload.title).toBe("新标题");
+    const payload = onPersist.mock.calls[0]?.[0];
+    expect(payload?.title).toBe("新标题");
     expect(result.current.saveState).toBe("saved");
     expect(result.current.lastSavedAt).toBeTypeOf("number");
   });
@@ -95,18 +108,18 @@ describe("useLocalDraft — 失败时保留草稿(不丢数据)", () => {
   });
 
   it("服务端失败时草稿仍在 IndexedDB(下次打开可恢复)", async () => {
-    const onPersist = vi.fn(async () => { throw new Error("500"); });
+    const onPersist = vi.fn<PersistFn>(async () => { throw new Error("500"); });
     const { result } = renderHook(() => useLocalDraft(baseProps({ onPersist })));
     act(() => { result.current.setTitle("未同步的标题"); });
     await act(async () => { await result.current.flush(); });
 
-    const draft = (await get(KEY)) as any;
+    const draft = (await get(KEY)) as DraftMeta | undefined;
     expect(draft).toBeDefined();
-    expect(draft.title).toBe("未同步的标题");
+    expect(draft?.title).toBe("未同步的标题");
   });
 
   it("服务端失败后重开编辑器能恢复草稿", async () => {
-    const failing = vi.fn(async () => { throw new Error("500"); });
+    const failing: Mock<PersistFn> = vi.fn<PersistFn>(async () => { throw new Error("500"); });
     const first = renderHook(() => useLocalDraft(baseProps({ onPersist: failing })));
     act(() => { first.result.current.setTitle("抢救回来的标题"); });
     await act(async () => { await first.result.current.flush(); });
@@ -122,9 +135,14 @@ describe("useLocalDraft — 失败时保留草稿(不丢数据)", () => {
 });
 
 describe("useLocalDraft — 页面卸载兜底(beacon)", () => {
+  type BeaconFn = (url: string, data?: Blob) => boolean;
+  /** 在测试里劫持 navigator.sendBeacon —— jsdom 自带实现,我们只需要装一个 mock 进去 */
+  const nav = navigator as Navigator & { sendBeacon: BeaconFn };
+  const installBeacon = (fn: BeaconFn) => { nav.sendBeacon = fn; };
+
   it("beforeunload 触发 sendBeacon,URL 指向该简历", async () => {
-    const beacon = vi.fn(() => true);
-    (globalThis as any).navigator.sendBeacon = beacon;
+    const beacon: Mock<BeaconFn> = vi.fn<BeaconFn>(() => true);
+    installBeacon(beacon);
 
     const { result } = renderHook(() => useLocalDraft(baseProps()));
     act(() => { result.current.setTitle("未保存的改动"); });
@@ -132,12 +150,12 @@ describe("useLocalDraft — 页面卸载兜底(beacon)", () => {
     act(() => { window.dispatchEvent(new Event("beforeunload")); });
 
     expect(beacon).toHaveBeenCalledTimes(1);
-    expect((beacon.mock.calls as any)[0][0]).toBe("/api/resumes/r1");
+    expect(beacon.mock.calls[0]?.[0]).toBe("/api/resumes/r1");
   });
 
   it("pagehide 也触发(safari bfcache)", async () => {
-    const beacon = vi.fn(() => true);
-    (globalThis as any).navigator.sendBeacon = beacon;
+    const beacon: Mock<BeaconFn> = vi.fn<BeaconFn>(() => true);
+    installBeacon(beacon);
 
     const { result } = renderHook(() => useLocalDraft(baseProps()));
     act(() => { result.current.setTitle("X"); });
@@ -147,8 +165,8 @@ describe("useLocalDraft — 页面卸载兜底(beacon)", () => {
   });
 
   it("无改动时不发 beacon", async () => {
-    const beacon = vi.fn(() => true);
-    (globalThis as any).navigator.sendBeacon = beacon;
+    const beacon: Mock<BeaconFn> = vi.fn<BeaconFn>(() => true);
+    installBeacon(beacon);
 
     renderHook(() => useLocalDraft(baseProps()));
     act(() => { window.dispatchEvent(new Event("beforeunload")); });
@@ -157,15 +175,15 @@ describe("useLocalDraft — 页面卸载兜底(beacon)", () => {
   });
 
   it("beacon 被拒绝时草稿仍落到 IndexedDB", async () => {
-    (globalThis as any).navigator.sendBeacon = vi.fn(() => false);
+    installBeacon(vi.fn<BeaconFn>(() => false));
 
     const { result } = renderHook(() => useLocalDraft(baseProps()));
     act(() => { result.current.setTitle("紧急保存"); });
     act(() => { window.dispatchEvent(new Event("beforeunload")); });
 
-    const draft = (await get(KEY)) as any;
+    const draft = (await get(KEY)) as DraftMeta | undefined;
     expect(draft).toBeDefined();
-    expect(draft.title).toBe("紧急保存");
+    expect(draft?.title).toBe("紧急保存");
   });
 });
 
@@ -230,7 +248,10 @@ describe("useLocalDraft — 草稿恢复策略(防陈旧覆盖)", () => {
     );
 
     await waitFor(() => expect(result.current.title).toBe("服务端标题"));
-    expect(await get(KEY)).toBeUndefined();
+    // 钩子丢弃草稿是异步的(读 IndexedDB → 删 IndexedDB),一次性断言会抢跑。
+    // 而且 IndexedDB 回调在满负荷跑全量用例时可能延迟超过 waitFor 默认的 1s,
+    // 所以这里轮询等待删除真正发生,并放宽超时。
+    await waitFor(async () => expect(await get(KEY)).toBeUndefined(), { timeout: 5000 });
   });
 
   it("7 天内的草稿即使时间戳略早也会被服务端基准救回", async () => {

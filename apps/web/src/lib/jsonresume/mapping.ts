@@ -211,8 +211,11 @@ export class JsonResumeParseError extends Error {
  */
 export function importJsonResume(raw: unknown): ResumeData {
   if (typeof raw === "string") {
-    try { raw = JSON.parse(raw); } catch (e: any) {
-      throw new JsonResumeParseError(`invalid JSON: ${e.message}`);
+    try {
+      raw = JSON.parse(raw);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new JsonResumeParseError(`invalid JSON: ${msg}`);
     }
   }
   if (!raw || typeof raw !== "object") {
