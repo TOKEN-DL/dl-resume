@@ -70,6 +70,11 @@ prototype/
 .vercel/
 
 # Next.js
+# next-env.d.ts 由 `next dev` / `next build` 自动生成。
+# dev 写 .next-dev/、build 写 .next/,里面的路由类型引用路径跟着模式变,
+# 跟踪它会让每次 `next dev` 都把工作区改脏,还容易误提交 dev 专用路径。
+# 改为不跟踪:`npm run typecheck` 前置 `next typegen` 自动补齐。
+next-env.d.ts
 next-env.d.ts.bak
 
 # PDF 字体(运行时按需获取;CI/clone 时跑 npm run setup:fonts 重新下载)
