@@ -70,6 +70,11 @@
   color: var(--ink-soft);
   text-decoration: none;
   transition: color 160ms, background 160ms;
+  /* 导航项不许折行也不许被压扁:
+     中文可以在任意两字之间断行,flex 收缩时最小内容宽度就是一个字,
+     空间一紧就会折成「首/页」「模板/广场」两行。宁可让整条横向滚动。 */
+  white-space: nowrap;
+  flex: none;
 }
 .link:hover {
   color: var(--ink);
@@ -89,6 +94,14 @@
   margin-left: -7px;
   border-radius: 2px;
   background: var(--blue);
+}
+
+/* 「智能优化」前面的 ✦ —— 跟首页 CTA、简历列表里的入口同一个符号 */
+.linkMark {
+  margin-right: 5px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--blue);
 }
 
 .group {
@@ -345,10 +358,37 @@
     padding: 7px 9px;
     font-size: 13px;
   }
+  /* 窄屏优先保住文字,✦ 先让位 —— 顶栏已经挤了品牌 / 四个入口 / 账号胶囊 */
+  .linkMark {
+    display: none;
+  }
   .emailText {
     display: none;
   }
   .pill {
     padding: 4px;
+  }
+}
+
+/* 四项导航在窄屏会挤 —— 逐级把让位的东西撤掉:
+   ✦ 先让(≤720),ADMIN 标签再让(≤480),最后压字号与内边距(≤380)。
+   品牌区的「简」字标始终保留,那是 logo。
+
+   这两个块必须排在 ≤720 之后:同优先级的媒体查询按源码顺序生效,
+   放前面会被后面的 ≤720 规则盖掉(那正是第一次实测 360px 溢出的原因)。 */
+@media (max-width: 480px) {
+  .link {
+    padding: 6px 6px;
+    font-size: 12px;
+  }
+  .adminTag {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .link {
+    padding: 5px 4px;
+    font-size: 11px;
   }
 }

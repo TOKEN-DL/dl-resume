@@ -3,7 +3,7 @@
  * SiteNav —— 全站顶栏。
  *
  * 重点盯三件事:
- *   1. 三个模块(首页 / 模板广场 / 我的简历)都在,当前页有激活态
+ *   1. 四个模块(首页 / 模板广场 / 智能优化 / 我的简历)都在,当前页有激活态
  *   2. 「我的简历」的下拉里有一块**显眼的实心「创建简历」按钮**
  *   3. 未登录时点「创建简历」去登录页;已登录时建简历并跳编辑器
  */
@@ -42,11 +42,29 @@ function openMenu() {
 }
 
 describe("SiteNav", () => {
-  it("渲染出三个模块:首页 / 模板广场 / 我的简历", () => {
+  it("渲染出四个模块:首页 / 模板广场 / 智能优化 / 我的简历", () => {
     render(<SiteNav />);
     expect(screen.getByRole("link", { name: "首页" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "模板广场" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "智能优化" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "我的简历" })).toBeTruthy();
+  });
+
+  it("「智能优化」指向 /optimize,✦ 标记不进无障碍名", () => {
+    render(<SiteNav />);
+    const link = screen.getByRole("link", { name: "智能优化" });
+    expect(link.getAttribute("href")).toBe("/optimize");
+    // ✦ 是装饰,aria-hidden 之后链接的可读名仍只有「智能优化」
+    expect(link.textContent).toContain("✦");
+  });
+
+  it("在 /optimize 上时「智能优化」带激活态", () => {
+    nav.pathname = "/optimize";
+    render(<SiteNav />);
+    expect(screen.getByRole("link", { name: "智能优化" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "首页" }).getAttribute("aria-current")).toBeNull();
   });
 
   it("当前页的导航项带 aria-current=page", () => {
