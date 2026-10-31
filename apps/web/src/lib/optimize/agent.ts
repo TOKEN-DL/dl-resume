@@ -159,14 +159,32 @@ export async function rewriteWithAgent(
   }
 
   try {
-    const remote = await choice.provider.rewrite({ data, plan, reviews });
-    // 合并两边的改动:本地改动在前(确定性),大模型改动在后
+    // 传给模型的是**本地改写之后**的简历:
+    // 模型的补丁打在已经排好序、时间已规范化的版本上,不会把本地修复冲掉。
+    const remote = await choice.provider.rewrite({
+      data: local.optimized,
+      plan,
+      reviews,
+    });
+    /**
+     * 合并两边的改动。
+     *
+     * 同一个字段本地和大模型都改过时,合成**一条**「原样 → 最终」,
+     * 别让用户在报告里看两遍同一个字段的对照(本地那次通常只是去编号,
+     * 大模型那次才是真正的内容改写,分开看会以为被改了两遍)。
+     */
     const seen = new Set(local.changes.map((c) => `${c.target}|${c.after}`));
-    const merged = [
-      ...local.changes,
-      ...remote.changes.filter((c) => !seen.has(`${c.target}|${c.after}`)),
-    ];
+    const merged: Change[] = [...local.changes];
+    for (const rc of remote.changes) {
+      const idx = merged.findIndex((c) => c.target === rc.target);
+      if (idx >= 0) {
+        merged[idx] = { ...rc, before: merged[idx].before };
+        continue;
+      }
+      if (!seen.has(`${rc.target}|${rc.after}`)) merged.push(rc);
+    }
     return {
+      // 模型是在本地改写结果上打的补丁,不是整份替换 —— 没被改的字段不会被动过
       optimized: remote.optimized,
       changes: merged,
       choice: {

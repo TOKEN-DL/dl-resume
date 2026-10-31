@@ -34,7 +34,7 @@ function tidy(html: string): string {
  * 只动 <li> 里的序号:纯文本段落里的序号往往是唯一的行号线索,删了就丢信息。
  * 分隔符后面必须跟空白或中文,否则「3D 建模」「1.2 版本」会被误伤。
  */
-function stripManualNumbering(html: string): string {
+export function stripManualNumbering(html: string): string {
   return html.replace(
     /(<li\b[^>]*>)\s*\d{1,2}\s*[.、)）](?=\s|$|[\u4e00-\u9fff])/gi,
     "$1",

@@ -39,9 +39,20 @@ describe("matchChange", () => {
     expect(matchChange("work:w1.description", [c])?.target).toBe("work:w1.description");
   });
 
-  it("粗发现可以命中细改动", () => {
-    const c = change("work:w1.period");
-    expect(matchChange("work", [c])?.target).toBe("work:w1.period");
+  it("粗发现可以命中细改动(字段级)", () => {
+    const c = change("basics.label.detail", "求职意向细节");
+    expect(matchChange("basics.label", [c])?.target).toBe("basics.label.detail");
+  });
+
+  it("裸模块名不认领单条改动(否则报告里会张冠李戴)", () => {
+    const one = change("projects:p1.description", "某个项目的描述");
+    // 发现说的是「projects 模块整体有问题」,挂一条具体项目的改动是误导
+    expect(matchChange("projects", [one])).toBeUndefined();
+  });
+
+  it("裸模块名仍能认领同名的整体改动(比如排序)", () => {
+    const order = change("projects", "项目经历顺序");
+    expect(matchChange("projects", [order])?.target).toBe("projects");
   });
 
   it("粗改动不得命中细发现(否则报告里会张冠李戴)", () => {

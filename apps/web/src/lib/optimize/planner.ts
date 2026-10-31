@@ -5,22 +5,32 @@
  * 用户看到的是:哪里有问题、为什么有问题、要怎么改、改完长什么样。
  */
 import type { Change, Finding, ModuleKey, ModuleReview, PlanItem } from "./types";
+import { MODULE_ORDER } from "./analyzer";
+
+/** 裸模块名(work / projects / skills …) */
+const MODULE_KEYS = new Set<string>(MODULE_ORDER);
 
 /**
  * 给一条发现找对应的改动。
  *
  * target 的路径有两级:细粒度(`work:w_1.description`)与粗粒度(`work`)。
- * 匹配时**只允许「发现比改动粗」的方向** —— 发现 `work` 可以对上改动
- * `work:w_1.period`。
+ * 匹配时**取最具体的那条** —— 命中 `work:w_1.description` 就不要拿
+ * 整个 `work` 段的对照来糊弄。
  *
- * 反过来不允许:如果「粗改动也能匹配细发现」,那么「工作经历顺序」这种
- * 整体排序改动会挂到「第 3 段经历没有量化结果」这种细问题上,
- * 报告里就变成「这条已自动改写:工作经历顺序」—— 纯属误导。
+ * 两条规则:
+ *   1. 精确命中。
+ *   2. 允许「发现比改动粗」:发现 `basics.label` 可以对上改动 `basics.label.x`。
+ *
+ * 但**裸模块名不认领单条改动**:发现 `projects` 说的是「这个模块整体有问题」,
+ * 而改动 `projects:p_1.description` 只是其中一条 —— 挂上去就成了误导。
+ * 「两个核心公司项目没进 projects 模块」配上「个人项目描述已改写」,
+ * 用户会以为那个结构问题已经解决了。
  */
 export function matchChange(target: string | undefined, changes: Change[]): Change | undefined {
   if (!target) return undefined;
   const candidates = changes.filter((c) => {
     if (c.target === target) return true;
+    if (MODULE_KEYS.has(target)) return false;
     return c.target.startsWith(`${target}.`) || c.target.startsWith(`${target}:`);
   });
   if (candidates.length === 0) return undefined;
