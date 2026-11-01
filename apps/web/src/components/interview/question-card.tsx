@@ -26,30 +26,17 @@
  * (包括父组件回滚)。
  */
 import { useId, useState } from "react";
+import {
+  CATEGORY_LABELS,
+  DIFFICULTY_LABELS,
+  normalizeDifficulty,
+  type QuestionCategory,
+  type QuestionDifficulty,
+} from "@/lib/interview/difficulty";
 import styles from "./interview.module.css";
-
-/** 难度档 1-4 */
-export type QuestionDifficulty = 1 | 2 | 3 | 4;
-
-/** 题目分类:基础 / 深挖 */
-export type QuestionCategory = "basic" | "deep";
 
 /** 星级语义:押题页「重点关注」/ 题库页「收藏」 */
 export type QuestionStarMode = "focus" | "favorite";
-
-/** 四档难度的标签(设计文档 §5.2) */
-export const DIFFICULTY_LABELS: Record<QuestionDifficulty, string> = {
-  1: "入门理解",
-  2: "熟练使用",
-  3: "原理机制",
-  4: "场景深挖",
-};
-
-/** 两类分类的标签 */
-export const CATEGORY_LABELS: Record<QuestionCategory, string> = {
-  basic: "基础",
-  deep: "深挖",
-};
 
 export interface QuestionCardProps {
   /** 题干 —— 永远可见 */
@@ -72,15 +59,6 @@ export interface QuestionCardProps {
   defaultOpen?: boolean;
   /** 透传到根节点的 className */
   className?: string;
-}
-
-/** 难度夹到 1-4;不是数字的按 1 算 */
-function normalizeDifficulty(value: number): QuestionDifficulty {
-  if (!Number.isFinite(value)) return 1;
-  const n = Math.round(value);
-  if (n <= 1) return 1;
-  if (n >= 4) return 4;
-  return n as QuestionDifficulty;
 }
 
 /** 分类认得出来就是 basic / deep,认不出来返回 null(调用方原样显示) */

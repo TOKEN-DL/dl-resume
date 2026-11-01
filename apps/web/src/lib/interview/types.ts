@@ -7,6 +7,13 @@
  * 这里只放类型与纯数据,不放逻辑 —— 逻辑在 generator / runner / job-store 里。
  * 与优化模块(optimize/types.ts)是同构体:那边的 OptimizeJob 对应这边的 InterviewJob。
  */
+import type { QuestionCategory, QuestionDifficulty } from "./difficulty";
+
+/**
+ * 难度的类型正本在 difficulty.ts —— 这里转发一份,
+ * 让「从 types.ts 取难度类型」的老路径继续能用。
+ */
+export type { QuestionCategory, QuestionDifficulty } from "./difficulty";
 
 /** 押题节点 —— 进度条上的每一格 */
 export type InterviewStageKey =
@@ -29,20 +36,20 @@ export interface StageState {
 }
 
 /**
- * 判重命中的规则。
+ * 判重命中的规则(R1 精确 / R2 近似 / R3 同考点)。
  *
- * 这里**不 import** dedupe.ts 里的 DedupRule —— types.ts 会被客户端组件 import,
- * 而 dedupe.ts 顺着 fingerprint.ts 摸到 node:crypto,会把服务端依赖带进浏览器包。
- * 两边的取值必须一致(R1 / R2 / R3),改一处记得改另一处。
+ * 正本放在这里 —— types.ts 是零依赖的类型模块,客户端组件也 import 它,
+ * 放在这里客户端那边不会顺着 import 链摸到 node:crypto。
+ * dedupe.ts 从这里取,不再各写一份。
  */
-export type JobDedupRule = "R1" | "R2" | "R3";
+export type DedupRule = "R1" | "R2" | "R3";
 
 /** 单题判重的命中记录 —— 一道题跟题库里哪道重复 */
 export interface JobDedupeHit {
   /** 在 job.questions 里的下标 */
   index: number;
   /** 命中的规则 */
-  rule: JobDedupRule;
+  rule: DedupRule;
   /** 相似度:R1 恒为 1,R3 通常很低 */
   similarity: number;
   /** 与之重复的那道既有题的题干 */
@@ -89,12 +96,6 @@ export interface JobDedupeResult {
 
 /** 生成引擎 —— 模型路径还是本地兜底 */
 export type QuestionProvider = "minimax" | "local";
-
-/** 难度档 1-4 */
-export type QuestionDifficulty = 1 | 2 | 3 | 4;
-
-/** 题目分类:基础 / 深挖 */
-export type QuestionCategory = "basic" | "deep";
 
 /**
  * 模型出题阶段的产物 —— 还没有答案。

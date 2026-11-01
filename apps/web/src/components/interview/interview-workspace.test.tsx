@@ -12,6 +12,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { InterviewWorkspace } from "./interview-workspace";
+import { LOCAL_ENGINE_NOTE } from "@/lib/interview/generator";
+import type { InterviewJobSummary, InterviewQuestion } from "@/lib/interview/types";
 
 const fetchMock = vi.fn();
 
@@ -264,5 +266,221 @@ describe("押题页 · 整套高度重复", () => {
     );
     // 确认层关掉,提示条露出来
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+/**
+ * 工作台的流程 —— 选来源 → 跑进度 → 看题卡。
+ *
+ * 盯六件事:
+ *   1. 一进来就接管还在跑的任务 —— 切页回来进度不丢
+ *   2. 提交后接口立刻返回,进度界面马上出现
+ *   3. 跑完展示题卡:题干常显、答案收起、按难度升序
+ *   4. 兜底模式会明确标注出来
+ *   5. 题卡可以勾「重点关注」
+ *   6. 「再押一套」回到来源选择,但不把上一套题删掉
+ */
+describe("InterviewWorkspace · 流程", () => {
+  const RESUME_ITEMS = [
+    { id: "r1", title: "后端工程师简历", template: "classic", updatedAt: "2026-01-01T00:00:00.000Z" },
+    { id: "r2", title: "产品经理简历", template: "classic", updatedAt: "2026-02-01T00:00:00.000Z" },
+  ];
+
+  function makeJobSummary(overrides: Partial<InterviewJobSummary> = {}): InterviewJobSummary {
+    return {
+      id: "iv_1",
+      userId: "u1",
+      status: "running",
+      title: "后端工程师简历",
+      source: { kind: "resume", resumeId: "r1" },
+      stages: [
+        { key: "scan", status: "done", detail: "识别到 3 个技能 · 2 段项目" },
+        { key: "generate", status: "running" },
+      ],
+      progress: 0.3,
+      currentStage: "generate",
+      createdAt: 1,
+      updatedAt: 2,
+      ...overrides,
+    };
+  }
+
+  interface Route {
+    match: (url: string, init?: RequestInit) => boolean;
+    respond: (url: string, init?: RequestInit) => { status?: number; body: unknown };
+  }
+
+  /** 装一个假的 fetch:按路由表回响应,没匹配上的回 404 */
+  function mockFetch(routes: Route[]) {
+    return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : String(input);
+      for (const r of routes) {
+        if (r.match(url, init)) {
+          const { status = 200, body } = r.respond(url, init);
+          return new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+      return new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
+    });
+  }
+
+  it("一进来就接管还在跑的任务 —— 切页回来进度不丢", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch([
+        {
+          match: (u) => u === "/api/interview",
+          respond: () => ({ body: { jobs: [makeJobSummary()] } }),
+        },
+      ]),
+    );
+    render(<InterviewWorkspace resumes={RESUME_ITEMS} />);
+    await waitFor(() => expect(screen.getByText("简历扫描")).toBeTruthy());
+  });
+
+  it("提交后接口立刻返回,进度界面马上出现", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch([
+        {
+          match: (u, i) => u === "/api/interview" && i?.method === "POST",
+          respond: () => ({ status: 202, body: { job: makeJobSummary() } }),
+        },
+        { match: (u) => u === "/api/interview", respond: () => ({ body: { jobs: [] } }) },
+      ]),
+    );
+    render(<InterviewWorkspace resumes={RESUME_ITEMS} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "开始押题" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "开始押题" }));
+    await waitFor(() => expect(screen.getByText("简历扫描")).toBeTruthy());
+  });
+
+  it("跑完展示题卡:题干常显、答案收起、按难度升序", async () => {
+    const questions: InterviewQuestion[] = [
+      { question: "第四档题", topic: "t4", category: "deep", difficulty: 4, answer: "答案四" },
+      { question: "第一档题", topic: "t1", category: "basic", difficulty: 1, answer: "答案一" },
+      { question: "第三档题", topic: "t3", category: "deep", difficulty: 3, answer: "答案三" },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      mockFetch([
+        {
+          match: (u) => u === "/api/interview",
+          respond: () => ({
+            body: {
+              jobs: [
+                makeJobSummary({ status: "awaiting-confirm", progress: 1, stages: [], questions }),
+              ],
+            },
+          }),
+        },
+      ]),
+    );
+    render(<InterviewWorkspace resumes={RESUME_ITEMS} />);
+    await waitFor(() => expect(screen.getByText("第一档题")).toBeTruthy());
+
+    const cards = screen.getAllByRole("article");
+    expect(cards).toHaveLength(3);
+    expect(cards[0].textContent).toContain("第一档题");
+    expect(cards[1].textContent).toContain("第三档题");
+    expect(cards[2].textContent).toContain("第四档题");
+
+    // 答案默认收起 —— 一个字都不在 DOM 里
+    expect(screen.queryByText("答案一")).toBeNull();
+  });
+
+  it("兜底模式会明确标注出来", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch([
+        {
+          match: (u) => u === "/api/interview",
+          respond: () => ({
+            body: {
+              jobs: [
+                makeJobSummary({
+                  status: "awaiting-confirm",
+                  progress: 1,
+                  stages: [],
+                  engineNote: LOCAL_ENGINE_NOTE,
+                }),
+              ],
+            },
+          }),
+        },
+      ]),
+    );
+    render(<InterviewWorkspace resumes={RESUME_ITEMS} />);
+    await waitFor(() => expect(screen.getByText(/本地兜底/)).toBeTruthy());
+  });
+
+  it("题卡可以勾「重点关注」", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch([
+        {
+          match: (u) => u === "/api/interview",
+          respond: () => ({
+            body: {
+              jobs: [
+                makeJobSummary({
+                  status: "awaiting-confirm",
+                  progress: 1,
+                  stages: [],
+                  questions: [
+                    { question: "第一档题", topic: "t1", category: "basic", difficulty: 1, answer: "答案一" },
+                  ],
+                }),
+              ],
+            },
+          }),
+        },
+      ]),
+    );
+    render(<InterviewWorkspace resumes={RESUME_ITEMS} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "重点关注" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "重点关注" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "取消重点关注" }).getAttribute("aria-pressed")).toBe(
+        "true",
+      ),
+    );
+  });
+
+  it("「再押一套」回到来源选择,但不把上一套题删掉", async () => {
+    const flowFetch = mockFetch([
+      {
+        match: (u) => u === "/api/interview",
+        respond: () => ({
+          body: {
+            jobs: [
+              makeJobSummary({
+                status: "awaiting-confirm",
+                progress: 1,
+                stages: [],
+                questions: [
+                  { question: "第一档题", topic: "t1", category: "basic", difficulty: 1, answer: "答案一" },
+                ],
+              }),
+            ],
+          },
+        }),
+      },
+    ]);
+    vi.stubGlobal("fetch", flowFetch);
+    render(<InterviewWorkspace resumes={RESUME_ITEMS} />);
+    await waitFor(() => expect(screen.getByText("第一档题")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "再押一套" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "开始押题" })).toBeTruthy());
+
+    // 这一版还没入库,题目只在内存里 —— 一删就再也看不回来了
+    const deleted = flowFetch.mock.calls.some(
+      ([u, i]) => String(u).includes("/api/interview/") && (i as RequestInit)?.method === "DELETE",
+    );
+    expect(deleted).toBe(false);
   });
 });
