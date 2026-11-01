@@ -302,6 +302,7 @@ GET    /api/interview                我的活跃任务 → { jobs }
 GET    /api/interview/[jobId]        状态 + 结果 → { job, set }
 DELETE /api/interview/[jobId]        取消任务
 POST   /api/interview/[jobId]/confirm 确认入库 → { inserted, skipped, setId }
+                                        body: { starredIndexes?: number[], force?: boolean }
 
 GET    /api/questions                题库列表 → { items, total, sets }
 PATCH  /api/questions/[id]           { starred: boolean } → 收藏切换
@@ -361,8 +362,11 @@ DELETE /api/questions?setId=<setId>  删除整套
 
 - 题干**始终可见**，答案**默认收起**
 - 用受控 React disclosure（`button` + `aria-expanded`），不用原生 `<details>`：样式可控，且与仓库现有组件风格一致
-- 收藏按钮当场可点
 - 折叠态**不显示答案摘要**（答案只整段出现，避免一眼瞥到要点）
+- **星级按钮在两个页面语义不同**：
+  - 押题页 = 「重点关注」。入库前题目还不在库里，收藏没有落点；勾选的题在**确认入库时直接落成 `starred = true`**
+  - 题库页 = 「收藏 / 取消收藏」，当场生效并持久化
+  - 同一个组件，星级状态由 props 决定（押题页是本地 state，题库页是 API 回写）
 
 底部：「确认入库题库」→ 二次确认层显示「12 题入库 / 跳过 N 题重复」→ 写入 → 「已入库 12 题 → 去题库」。
 
@@ -480,10 +484,18 @@ src/components/questions/questions.module.css
 
 ## 12. 实施顺序
 
-1. Prisma model + 迁移 + `repo.ts`
-2. `fingerprint.ts` + `dedupe.ts` + 单测（**先去重后 UI**，去重是核心风险）
-3. `generator.ts`（prompt / 协议 / 本地兜底）+ 单测
-4. `job-store.ts` + `runner.ts` + `stages.ts` + `types.ts`
-5. API 四组路由
-6. UI：题卡 → 押题页 → 题库页
-7. 导航接入 + 全量回归 + 端到端验证
+拆解为 11 个可独立验收的 ticket，见 `.scratch/interview-question-bank/issues/`。依赖图：
+
+```
+01 判重引擎 ──┬──────────────► 08 跨套判重 ──┐
+02 模型客户端 ─┐                              │
+03 数据层 ──┬──┤                              ├─► 10 回归 ─► 11 e2e
+            │  │                              │
+        04 题卡┤                              │
+            │  ├─► 05 题库页 ─┐               │
+            └──┼─► 06 押题台 ─┴─► 07 入库 ──┴─► 09 筛选互跳
+```
+
+- **可立即开工**：01、02、03（无阻塞）
+- 04 完成后，05 与 06 可并行
+- 06 的 `dedupe` 节点在 08 之前只做**套内**判重；**跨套**判重与套级拦截在 08 落地
