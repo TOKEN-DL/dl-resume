@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * QuestionBank —— 我的题库(按批次分组 / 收藏 / 删除)。
+ * QuestionBank —— 我的题库(按批次分组 / 收藏 / 删除 / 筛选同步到 URL)。
  *
  * 盯六件事:
  *   1. 按**批次**分组:组头显示来源简历、生成时间、题数
@@ -9,12 +9,50 @@
  *   4. 能删单题、删整套;删完整套后该组消失
  *   5. 顶部「再押一套」指向 /interview
  *   6. 空题库给提示,不白屏
+ *   7. 筛选条件反映到 URL 上:刷新能恢复、非法值不崩、改筛选不进历史
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import { QuestionBank } from "./question-bank";
 
 const fetchMock = vi.fn();
+
+/**
+ * next/navigation 的替身。
+ *
+ * searchParams 做成可变的:组件从它读初始筛选条件,
+ * 测试要能改它来模拟「刷新页面 / 带参数打开链接」。
+ *
+ * replace 照着真 router 的样子来 —— 改 URL、然后让 useSearchParams 返回新值,
+ * 不然测不出「URL → state」那一趟。
+ */
+const nav = vi.hoisted(() => {
+  const state = {
+    searchParams: new URLSearchParams(),
+    pathname: "/questions",
+    replace: vi.fn(),
+    push: vi.fn(),
+  };
+  // 照着真 router 的样子:replace 改 URL,useSearchParams 下次渲染就能拿到新值
+  state.replace.mockImplementation((url: string) => {
+    const raw = String(url).split("?")[1] ?? "";
+    state.searchParams = new URLSearchParams(raw);
+  });
+  return state;
+});
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => nav.searchParams,
+  usePathname: () => nav.pathname,
+  useRouter: () => ({
+    replace: nav.replace,
+    push: nav.push,
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
 
 const SET_A = {
   id: "qs_1",
@@ -123,6 +161,9 @@ function callOf(method: string, urlPart: string) {
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+  nav.searchParams = new URLSearchParams();
+  nav.replace.mockClear();
+  nav.push.mockClear();
 });
 
 afterEach(() => {
@@ -271,5 +312,160 @@ describe("QuestionBank", () => {
       );
       expect(call).toBeTruthy();
     });
+  });
+});
+
+/**
+ * 筛选条件 ↔ URL 同步。
+ *
+ * 规则:
+ *   1. 初始筛选条件从 URL 的 query string 里读(刷新页面不丢)
+ *   2. 改筛选条件 → router.replace 写回 URL(不是 push,不往历史里塞)
+ *   3. URL 里的非法值当没给(回退默认值),页面不崩
+ */
+describe("QuestionBank 的 URL 同步", () => {
+  it("初始筛选条件从 URL 恢复:刷新后不重置成默认", async () => {
+    nav.searchParams = new URLSearchParams(
+      "resumeId=res_1&category=deep&difficulty=4&starred=true&q=RAG",
+    );
+    installFetch({ items: [ITEM_2], sets: [SET_A] });
+    render(<QuestionBank />);
+
+    // 控件的选中态跟着 URL 走
+    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    expect((screen.getByLabelText("来源简历") as HTMLSelectElement).value).toBe("res_1");
+    expect((screen.getByLabelText("分类") as HTMLSelectElement).value).toBe("deep");
+    expect((screen.getByLabelText("难度") as HTMLSelectElement).value).toBe("4");
+    expect((screen.getByLabelText("仅看收藏") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("关键词") as HTMLInputElement).value).toBe("RAG");
+
+    // 第一次请求就带着 URL 上的条件
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/api/questions?"));
+      expect(String(call?.[0])).toContain("category=deep");
+      expect(String(call?.[0])).toContain("difficulty=4");
+      expect(String(call?.[0])).toContain("starred=true");
+      expect(String(call?.[0])).toContain("q=RAG");
+    });
+  });
+
+  it("改筛选条件 → URL 的 query string 跟着变", async () => {
+    installFetch({ items: [ITEM_2], sets: [SET_A] });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
+
+    await waitFor(() => {
+      expect(nav.replace).toHaveBeenCalledWith(
+        "/questions?category=deep",
+        expect.objectContaining({ scroll: false }),
+      );
+    });
+  });
+
+  it("多个筛选条件叠加 → URL 上都带着", async () => {
+    installFetch({ items: [ITEM_3], sets: [SET_B] });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByText(ITEM_3.question)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
+    fireEvent.click(screen.getByLabelText("仅看收藏"));
+    fireEvent.change(screen.getByLabelText("难度"), { target: { value: "3" } });
+
+    await waitFor(() => {
+      const last = nav.replace.mock.calls.at(-1);
+      expect(String(last?.[0])).toContain("category=deep");
+      expect(String(last?.[0])).toContain("difficulty=3");
+      expect(String(last?.[0])).toContain("starred=true");
+    });
+  });
+
+  it("改筛选用 replace 而不是 push:不往浏览器历史里塞记录", async () => {
+    installFetch({ items: [ITEM_2], sets: [SET_A] });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
+
+    await waitFor(() => expect(nav.replace).toHaveBeenCalled());
+    expect(nav.push).not.toHaveBeenCalled();
+    // scroll:false —— 改筛选不该让页面跳回顶部
+    expect(nav.replace.mock.calls.at(-1)?.[1]).toMatchObject({ scroll: false });
+  });
+
+  it("清空筛选 → URL 回到干净的路径", async () => {
+    nav.searchParams = new URLSearchParams("category=deep");
+    installFetch({ items: [ITEM_2], sets: [SET_A] });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "" } });
+
+    await waitFor(() => {
+      expect(nav.replace).toHaveBeenCalledWith(
+        "/questions",
+        expect.objectContaining({ scroll: false }),
+      );
+    });
+  });
+
+  it("URL 里的非法值当没给:页面不崩,回退成默认值", async () => {
+    // difficulty=99 超出 1~4,category=nope 不是 basic/deep,starred=maybe 不是布尔
+    nav.searchParams = new URLSearchParams(
+      "category=nope&difficulty=99&starred=maybe&resumeId=",
+    );
+    installFetch({ items: [ITEM_1], sets: [SET_A] });
+    render(<QuestionBank />);
+
+    // 页面照常渲染,控件回到默认
+    await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
+    expect((screen.getByLabelText("分类") as HTMLSelectElement).value).toBe("");
+    expect((screen.getByLabelText("难度") as HTMLSelectElement).value).toBe("");
+    expect((screen.getByLabelText("仅看收藏") as HTMLInputElement).checked).toBe(false);
+
+    // 请求里也不能带非法值(接口对非法值直接 400)
+    const url = String(fetchMock.mock.calls[0]?.[0]);
+    expect(url).not.toContain("category=");
+    expect(url).not.toContain("difficulty=");
+    expect(url).not.toContain("starred=");
+  });
+
+  it("URL 变化 → 筛选状态跟着更新(不写回 URL,避免死循环)", async () => {
+    installFetch({ items: [ITEM_2], sets: [SET_A] });
+    const { rerender } = render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    nav.replace.mockClear();
+
+    // 模拟用户手动改地址栏 / 前进后退:URL 变了,筛选要跟上
+    nav.searchParams = new URLSearchParams("category=deep");
+    rerender(<QuestionBank />);
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("分类") as HTMLSelectElement).value).toBe("deep");
+    });
+    // URL → state 这一趟不该反过来再写一次 URL
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it("改筛选只重新拉一次数据(URL 那一趟不重复拉)", async () => {
+    installFetch({ items: [ITEM_2], sets: [SET_A] });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    const before = fetchMock.mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u).includes("category=deep"));
+      expect(call).toBeTruthy();
+    });
+    // 等 URL 那一趟也跑完
+    await waitFor(() => expect(nav.replace).toHaveBeenCalled());
+
+    // 只多了一次请求 —— 自己写进去的 URL 回来时不该再拉一遍
+    expect(fetchMock.mock.calls.length).toBe(before + 1);
   });
 });

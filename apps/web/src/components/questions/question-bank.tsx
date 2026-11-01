@@ -11,9 +11,14 @@
  *
  * 题卡本身不归本文件管(那是 interview 目录下的公共组件),这里只负责分组、
  * 收藏回写、删除、空状态与筛选条。
+ *
+ * 筛选条件跟 URL 是一回事:条件写在 URL 的 query string 里,刷新页面还在,
+ * 链接也能直接发给同事。方向只有一条 —— 用户改了筛选才写回 URL,
+ * 外面改了 URL(前进后退 / 手改地址栏)才读回 state,两头不互相追。
  */
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuestionCard } from "@/components/interview/question-card";
 import styles from "./questions.module.css";
 
@@ -42,7 +47,12 @@ export interface QuestionBankSet {
   count: number;
 }
 
-/** 筛选条件 —— 与设计文档 §7 的查询参数一一对应 */
+/**
+ * 筛选条件 —— 与设计文档 §7 的查询参数一一对应。
+ *
+ * 只有筛选条上真正有的维度:来源简历 / 分类 / 难度 / 仅看收藏 / 关键词。
+ * setId 是删整套时用的,不是筛选维度,不进 URL。
+ */
 interface BankFilters {
   resumeId: string;
   category: string;
@@ -58,6 +68,12 @@ const NO_FILTERS: BankFilters = {
   starred: false,
   q: "",
 };
+
+/** 合法的分类(与 /api/questions 的校验一致) */
+const VALID_CATEGORIES = ["basic", "deep"];
+
+/** 合法的难度档(与 /api/questions 的校验一致) */
+const VALID_DIFFICULTIES = ["1", "2", "3", "4"];
 
 /** 生成引擎的中文说法 */
 function providerLabel(provider: string): string {
@@ -82,32 +98,138 @@ function formatDateTime(iso: string): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** 把筛选条件拼成查询串 */
+/**
+ * 把筛选条件拼成查询串(不含前导 ?)。
+ *
+ * 空值的维度不写进去 —— URL 短一点,发出去的请求也干净一点。
+ * starred 只在为真时写;写 true 而不是 1,跟 /api/questions 能解析的形式对齐。
+ *
+ * 取值都先 trim —— 跟 parseFilters 对齐,保证 parseFilters(buildQuery(f)) === f。
+ */
 function buildQuery(filters: BankFilters): string {
   const qs = new URLSearchParams();
-  if (filters.resumeId) qs.set("resumeId", filters.resumeId);
-  if (filters.category) qs.set("category", filters.category);
-  if (filters.difficulty) qs.set("difficulty", filters.difficulty);
+  const resumeId = filters.resumeId.trim();
+  const category = filters.category.trim();
+  const difficulty = filters.difficulty.trim();
+  const q = filters.q.trim();
+  if (resumeId) qs.set("resumeId", resumeId);
+  if (category) qs.set("category", category);
+  if (difficulty) qs.set("difficulty", difficulty);
   if (filters.starred) qs.set("starred", "true");
-  if (filters.q) qs.set("q", filters.q);
-  const s = qs.toString();
-  return s ? `?${s}` : "";
+  if (q) qs.set("q", q);
+  return qs.toString();
+}
+
+/**
+ * 从查询串里读回筛选条件。
+ *
+ * 非法值一律当没给(回退默认值)—— 手捏的链接不该把页面搞崩,
+ * 更不该让 /api/questions 直接 400。合法的取值跟接口的校验一一对齐:
+ * 分类 basic/deep、难度 1~4、starred 认 true/1。
+ */
+function parseFilters(params: URLSearchParams): BankFilters {
+  const category = (params.get("category") ?? "").trim();
+  const difficulty = (params.get("difficulty") ?? "").trim();
+  const starred = (params.get("starred") ?? "").trim().toLowerCase();
+  return {
+    ...NO_FILTERS,
+    resumeId: (params.get("resumeId") ?? "").trim(),
+    category: VALID_CATEGORIES.includes(category) ? category : "",
+    difficulty: VALID_DIFFICULTIES.includes(difficulty) ? difficulty : "",
+    starred: starred === "true" || starred === "1",
+    q: (params.get("q") ?? "").trim(),
+  };
+}
+
+/** 两套筛选条件是不是一回事 */
+function sameFilters(a: BankFilters, b: BankFilters): boolean {
+  return (
+    a.resumeId === b.resumeId &&
+    a.category === b.category &&
+    a.difficulty === b.difficulty &&
+    a.starred === b.starred &&
+    a.q === b.q
+  );
+}
+
+/** 把查询串拼到路径后面(没有查询串就只给路径) */
+function withQuery(path: string, qs: string): string {
+  return qs ? `${path}?${qs}` : path;
 }
 
 export function QuestionBank() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  /** URL 上的查询串 —— 拿字符串当依赖,对象身份不稳 */
+  const qs = searchParams.toString();
+
   const [items, setItems] = useState<QuestionBankItem[]>([]);
   const [sets, setSets] = useState<QuestionBankSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<BankFilters>(NO_FILTERS);
+  /**
+   * 筛选条件。
+   *
+   * 初值从 URL 里读 —— 刷新页面后条件还在,链接也能直接发给同事。
+   * 之后只有「用户改了筛选」才动它,再把新条件写回 URL。
+   */
+  const [filters, setFilters] = useState<BankFilters>(() =>
+    parseFilters(new URLSearchParams(qs)),
+  );
   /** 搜索框里的字 —— 回车 / 点「筛选」才真正生效,边打字边查太吵 */
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(() => filters.q);
+  /**
+   * 当前生效的筛选条件 —— 给回调和 effect 读最新值用。
+   * effect 的依赖只有 qs,闭包里拿到的 filters 会是旧的,所以留一份 ref。
+   */
+  const filtersRef = useRef(filters);
+
+  /** 把筛选条件写回 URL —— 用 replace,筛选不该往浏览器历史里塞一堆记录 */
+  const writeUrl = useCallback(
+    (next: BankFilters) => {
+      const query = buildQuery(next);
+      router.replace(withQuery(pathname, query), { scroll: false });
+    },
+    [pathname, router],
+  );
+
+  /** 改筛选条件:改 state + 写回 URL */
+  const applyFilters = useCallback(
+    (patch: Partial<BankFilters>) => {
+      const next = { ...filtersRef.current, ...patch };
+      // 条件没变就别折腾 —— 免得多打一次接口、多写一次 URL
+      if (sameFilters(filtersRef.current, next)) return;
+      filtersRef.current = next;
+      setFilters(next);
+      writeUrl(next);
+    },
+    [writeUrl],
+  );
+
+  /**
+   * URL 变了 → 把条件读回 state。
+   *
+   * 这一趟**只读不写**:写 URL 的只有 applyFilters(用户主动改筛选)那一条路。
+   * 所以「URL → state → URL」不会绕成圈 —— state 变了也不会回头写 URL。
+   *
+   * 顺带一提,parseFilters(buildQuery(f)) === f,所以自己写进去的那份 URL
+   * 回来时解析出来的条件跟当前 state 一样,setFilters 直接原地返回,不会多打一次接口。
+   */
+  useEffect(() => {
+    const next = parseFilters(new URLSearchParams(qs));
+    const prevQ = filtersRef.current.q;
+    filtersRef.current = next;
+    setFilters((cur) => (sameFilters(cur, next) ? cur : next));
+    // 生效的关键词变了,搜索框要跟上(前进后退 / 手改地址栏)
+    if (prevQ !== next.q) setKeyword(next.q);
+  }, [qs]);
 
   /** 拉列表。筛选条件一变就重拉 —— 题库按 userId 过滤,不需要分页兜底 */
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/questions${buildQuery(filters)}`)
+    fetch(withQuery("/api/questions", buildQuery(filters)))
       .then(async (res) => {
         if (!res.ok) throw new Error("bad status");
         return (await res.json()) as { items?: QuestionBankItem[]; sets?: QuestionBankSet[] };
@@ -258,7 +380,7 @@ export function QuestionBank() {
         className={styles.filters}
         onSubmit={(e) => {
           e.preventDefault();
-          setFilters((cur) => ({ ...cur, q: keyword.trim() }));
+          applyFilters({ q: keyword.trim() });
         }}
       >
         <label className={styles.field}>
@@ -266,7 +388,7 @@ export function QuestionBank() {
           <select
             className={styles.select}
             value={filters.resumeId}
-            onChange={(e) => setFilters((cur) => ({ ...cur, resumeId: e.target.value }))}
+            onChange={(e) => applyFilters({ resumeId: e.target.value })}
           >
             <option value="">全部简历</option>
             {resumeOptions.map((opt) => (
@@ -282,7 +404,7 @@ export function QuestionBank() {
           <select
             className={styles.select}
             value={filters.category}
-            onChange={(e) => setFilters((cur) => ({ ...cur, category: e.target.value }))}
+            onChange={(e) => applyFilters({ category: e.target.value })}
           >
             <option value="">全部分类</option>
             <option value="basic">基础</option>
@@ -295,7 +417,7 @@ export function QuestionBank() {
           <select
             className={styles.select}
             value={filters.difficulty}
-            onChange={(e) => setFilters((cur) => ({ ...cur, difficulty: e.target.value }))}
+            onChange={(e) => applyFilters({ difficulty: e.target.value })}
           >
             <option value="">全部难度</option>
             {DIFFICULTY_OPTIONS.map(([value, label]) => (
@@ -310,7 +432,7 @@ export function QuestionBank() {
           <input
             type="checkbox"
             checked={filters.starred}
-            onChange={(e) => setFilters((cur) => ({ ...cur, starred: e.target.checked }))}
+            onChange={(e) => applyFilters({ starred: e.target.checked })}
           />
           <span>仅看收藏</span>
         </label>
