@@ -1,0 +1,26 @@
+/**
+ * /questions 页面外壳样式。
+ *
+ * 跟 /optimize 同一套版式:导航栏 + 一块居中的内容区。
+ * 颜色与字体全走既有设计令牌。
+ */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 48px 40px 80px;
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding: 28px 16px 56px;
+  }
+}
