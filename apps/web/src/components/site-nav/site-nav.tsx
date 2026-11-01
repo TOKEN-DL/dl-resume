@@ -3,16 +3,17 @@
 /**
  * SiteNav —— 全站顶栏。
  *
- * 四个模块:首页 / 模板广场 / 智能优化 / 我的简历。
+ * 五个模块:首页 / 模板广场 / 智能优化 / 面试押题 / 我的简历。
  * 「我的简历」带一个下拉,下拉的第一项就是整块实心的「创建简历」主按钮,
  * 下面跟着最近编辑过的简历,再往下是模板广场 / 设置 / 退出登录。
  *
  * 「智能优化」是简历体检工作台,顶部带 ✦ 标记 —— 首页 CTA 和「我的简历」
  * 里的入口用的是同一个符号,一眼能认出是同一个功能。
+ * 「面试押题」用 ◎ 标记,同理。
  *
  * 账号信息由 server 组件通过 props 传进来(email 为空 = 未登录),
- * 组件本身不碰 session —— 这样 /、/templates、/resumes、/optimize 四个入口
- * 都能复用同一份导航,各自决定要不要读 session。
+ * 组件本身不碰 session —— 这样 /、/templates、/resumes、/optimize、/interview
+ * 五个入口都能复用同一份导航,各自决定要不要读 session。
  */
 
 import Link from "next/link";
@@ -40,13 +41,15 @@ export interface SiteNavProps {
 /**
  * 顶部主导航 —— 「我的简历」自带下拉,不在这张表里。
  *
- * mark 是给「智能优化」用的 ✦ 标记,跟首页 CTA、简历列表里的入口一致。
- * 所有项都带 mark 字段(不用时给空串),渲染时就不用判空分支。
+ * mark 是给「智能优化」(✦)与「面试押题」(◎)用的标记,跟首页 CTA、
+ * 简历列表里的入口一致。所有项都带 mark 字段(不用时给空串),
+ * 渲染时就不用判空分支。
  */
 const PRIMARY_LINKS = [
   { href: "/", label: "首页", mark: "" },
   { href: "/templates", label: "模板广场", mark: "" },
   { href: "/optimize", label: "智能优化", mark: "✦" },
+  { href: "/interview", label: "面试押题", mark: "◎" },
 ] as const;
 
 /** 默认值用常量,避免每次渲染都造一个新数组导致 useMemo 失效 */

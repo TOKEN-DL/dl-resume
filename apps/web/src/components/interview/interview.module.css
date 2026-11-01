@@ -222,3 +222,463 @@
     align-self: flex-start;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   以下是「面试押题工作台」的样式(#20)。
+   前缀约定:
+     iw = interview workspace(工作台:来源选择 + 结果面板)
+     ip = interview progress(进度面板)
+   颜色一律走既有设计令牌,不引入新色相;字体只用 --font-display /
+   --font-ui / --font-mono 三支,不新增字体。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── 工作台外壳 ────────────────────────────────────────────────── */
+
+.iwWorkspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.iwErrorBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--paper-edge);
+  border-left: 3px solid var(--blue-soft);
+  border-radius: 10px;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.iwErrorBar button {
+  flex: none;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: var(--pencil);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.iwErrorBar button:hover {
+  color: var(--ink);
+}
+
+/* ─── 来源选择 ──────────────────────────────────────────────────── */
+
+.iwPicker {
+  padding: 22px 24px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.iwPickerHead {
+  margin-bottom: 16px;
+}
+
+.iwPickerTitle {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.iwPickerSub {
+  margin: 6px 0 0;
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.iwEmptyBox {
+  padding: 28px 20px;
+  border: 1px dashed var(--paper-edge);
+  border-radius: 12px;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.8;
+  text-align: center;
+}
+
+.iwResumeList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.iwResumeItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+
+.iwResumeItem:hover {
+  border-color: var(--blue-soft);
+  background: var(--paper);
+}
+
+.iwResumeItemActive {
+  border-color: var(--blue);
+  background: var(--highlight);
+}
+
+.iwResumeMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.iwResumeTitle {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.iwResumeSub {
+  color: var(--pencil);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.iwRadio {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--pencil-soft);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.iwResumeItemActive .iwRadio {
+  border-color: var(--blue);
+  background: var(--blue);
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+.iwActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.iwPrimaryBtn {
+  padding: 10px 20px;
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 160ms;
+}
+
+.iwPrimaryBtn:hover:not(:disabled) {
+  background: var(--blue-deep);
+}
+
+.iwPrimaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.iwGhostBtn {
+  padding: 9px 16px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 160ms, color 160ms;
+}
+
+.iwGhostBtn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.iwHint {
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ─── 进度面板 ──────────────────────────────────────────────────── */
+
+.ipCard {
+  padding: 22px 24px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ipHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ipTitle {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.ipSub {
+  margin-top: 4px;
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ipPct {
+  flex: none;
+  color: var(--blue);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.ipTrack {
+  height: 6px;
+  margin: 16px 0 18px;
+  border-radius: 999px;
+  background: var(--paper-deep);
+  overflow: hidden;
+}
+
+.ipFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue);
+  transition: width 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.ipStageList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ipStage {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.ipStageDot {
+  flex: none;
+  width: 18px;
+  color: var(--pencil-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.ipStageBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ipStageRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ipStageName {
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ipStageStatus {
+  flex: none;
+  color: var(--pencil);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ipStageDetail {
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* 节点状态 —— 走已有的冷色阶,不引入新色相 */
+.ipStagePending .ipStageDot,
+.ipStagePending .ipStageStatus {
+  color: var(--pencil-soft);
+}
+
+.ipStageSkipped .ipStageDot,
+.ipStageSkipped .ipStageStatus {
+  color: var(--pencil);
+}
+
+.ipStageRunning {
+  border-color: var(--blue-soft);
+  background: var(--highlight);
+}
+.ipStageRunning .ipStageDot,
+.ipStageRunning .ipStageStatus {
+  color: var(--blue);
+}
+
+.ipStageDone .ipStageDot {
+  color: var(--blue-soft);
+}
+
+.ipStageDone .ipStageStatus {
+  color: var(--blue-soft);
+}
+
+.ipStageFailed {
+  border-color: var(--pencil-soft);
+}
+.ipStageFailed .ipStageDot,
+.ipStageFailed .ipStageStatus {
+  color: var(--ink-soft);
+}
+.ipStageFailed .ipStageDetail {
+  color: var(--ink-soft);
+}
+
+.ipFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.ipLeaveHint {
+  margin: 0;
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ─── 结果面板 ──────────────────────────────────────────────────── */
+
+.iwResult {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.iwNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--paper-edge);
+  border-left: 3px solid var(--blue-soft);
+  border-radius: 10px;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.iwNoticeFallback {
+  border-left-color: var(--blue);
+  background: var(--highlight);
+}
+
+.iwResultHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.iwResultTitle {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.iwResultSub {
+  margin: 4px 0 0;
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.iwCardList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .iwPicker,
+  .ipCard {
+    padding: 16px;
+  }
+  .ipHead {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
