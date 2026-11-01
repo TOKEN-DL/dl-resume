@@ -221,15 +221,59 @@ describe("本地兜底出题", () => {
     expect(LOCAL_ENGINE_NOTE).toContain("本地兜底");
   });
 
-  it("关键词池转一格:同一份简历再押一次,出的题换一组搭配", () => {
-    const shifted = buildLocalQuestions(scanResume(RESUME), 1);
-    expect(shifted).toHaveLength(12);
-    expect(shifted.map((q) => q.question)).not.toEqual(questions.map((q) => q.question));
+  it("避开已经出过的题:同一份简历再押一次,出的题换一组", () => {
+    const again = buildLocalQuestions(
+      scanResume(RESUME),
+      questions.map((q) => q.question),
+    );
+    expect(again).toHaveLength(12);
+    expect(again.map((q) => q.question)).not.toEqual(questions.map((q) => q.question));
   });
 
-  it("转格之后考点依然两两不同(套内判重不会自伤)", () => {
-    const shifted = buildLocalQuestions(scanResume(RESUME), 1);
-    expect(new Set(shifted.map((q) => q.topic)).size).toBe(12);
+  it("避开之后考点依然两两不同(套内判重不会自伤)", () => {
+    const again = buildLocalQuestions(
+      scanResume(RESUME),
+      questions.map((q) => q.question),
+    );
+    expect(new Set(again.map((q) => q.topic)).size).toBe(12);
+  });
+
+  it("关键词池刚好整除 12 时,第二轮也不会跟第一轮撞死", () => {
+    // 池长 6 —— 12 能被它整除。按「已出题数」轮转的话轮转量是 0,
+    // 第二套跟第一套一字不差,用户从此押不出新题(回归用例)。
+    const wide = makeResume({
+      skills: [
+        { id: "s1", name: "TypeScript", level: "advanced" },
+        { id: "s2", name: "PostgreSQL", level: "intermediate" },
+        { id: "s3", name: "Redis", level: "intermediate" },
+        { id: "s4", name: "Docker", level: "intermediate" },
+        { id: "s5", name: "Kubernetes", level: "intermediate" },
+        { id: "s6", name: "React", level: "intermediate" },
+      ],
+      projects: [],
+    });
+    const first = buildLocalQuestions(scanResume(wide));
+    const second = buildLocalQuestions(
+      scanResume(wide),
+      first.map((q) => q.question),
+    );
+    expect(second).toHaveLength(12);
+    // 两轮加起来 24 道**互不相同**的题
+    expect(new Set([...first, ...second].map((q) => q.question)).size).toBe(24);
+  });
+
+  it("组合用尽时退回原组合(由上层判重去拦,不假装还能出新的)", () => {
+    // 池长 1 → 组合空间只有 12 个 → 第二轮必然重复
+    const narrow = makeResume({
+      skills: [{ id: "s1", name: "TypeScript", level: "advanced" }],
+      projects: [],
+    });
+    const first = buildLocalQuestions(scanResume(narrow));
+    const second = buildLocalQuestions(
+      scanResume(narrow),
+      first.map((q) => q.question),
+    );
+    expect(second.map((q) => q.question)).toEqual(first.map((q) => q.question));
   });
 });
 
@@ -535,7 +579,7 @@ describe("runJob", () => {
     const details = Object.fromEntries(job.stages.map((s) => [s.key, s.detail]));
     expect(details.scan).toBe("识别到 3 个技能 · 2 段项目");
     expect(details.generate).toBe("生成 12 道题");
-    expect(details.dedupe).toBe("跳过 0 道重复题");
+    expect(details.dedupe).toBe("标出 0 道重复题");
     expect(details.answer).toBe("生成 12 份参考答案");
     expect(details.confirm).toBe("等你确认后写入题库");
     for (const s of job.stages) {
@@ -635,7 +679,7 @@ describe("runJob · 跨套判重", () => {
     expect(job.dedupe?.threshold).toBe(7);
     expect(job.dedupe?.isDuplicate).toBe(true);
     expect(job.dedupe?.matchedSet?.id).toBe("qs_old");
-    expect(job.stages.find((s) => s.key === "dedupe")?.detail).toBe("跳过 12 道重复题");
+    expect(job.stages.find((s) => s.key === "dedupe")?.detail).toBe("标出 12 道重复题");
   }, 20000);
 
   it("题库是空的:一道都不算重复", async () => {

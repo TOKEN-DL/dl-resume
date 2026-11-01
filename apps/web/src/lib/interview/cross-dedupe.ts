@@ -145,6 +145,8 @@ export function dedupeAgainstLibrary(
         id: setId,
         title: items[0]?.setTitle ?? "",
         createdAt: items[0]?.setCreatedAt ?? 0,
+        // 跟**这一套**重复的题数 —— 门槛就是按它算的,提示条也要报它
+        duplicateCount: r.duplicateCount,
       };
     }
   }

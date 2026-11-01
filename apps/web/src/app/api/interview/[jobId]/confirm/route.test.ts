@@ -252,11 +252,26 @@ describe("POST /api/interview/[jobId]/confirm", () => {
   });
 
   it("走本地兜底的任务,provider 记成 local", async () => {
-    createJob(makeJob({ engineNote: "本地兜底:模板化问题,参考答案仅为要点提纲" }), { data: {} });
+    // provider 由出题时写进任务 —— 不再从 engineNote 的文案里反推
+    createJob(
+      makeJob({
+        provider: "local",
+        engineNote: "本地兜底:模板化问题,参考答案仅为要点提纲",
+      }),
+      { data: {} },
+    );
 
     await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
 
     expect(saveQuestionSetMock.mock.calls[0][0].provider).toBe("local");
+  });
+
+  it("模型路径的任务,provider 记成 minimax", async () => {
+    createJob(makeJob({ provider: "minimax" }), { data: {} });
+
+    await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
+
+    expect(saveQuestionSetMock.mock.calls[0][0].provider).toBe("minimax");
   });
 
   it("入库后任务状态变 confirmed,并记住套 id", async () => {

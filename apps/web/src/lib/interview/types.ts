@@ -69,11 +69,26 @@ export interface JobDedupeResult {
   threshold: number;
   /** 是否「整套高度重复」 */
   isDuplicate: boolean;
-  /** 最像的那一套(重复最多的那一套) */
-  matchedSet: { id: string; title: string; createdAt: number } | null;
+  /**
+   * 最像的那一套(重复最多的那一套)。
+   *
+   * duplicateCount 是**与这一套**重复的题数 —— 套级门槛就是按它算的,
+   * 提示条上报的也必须是它。全库重复数(duplicateCount)算的是「跟题库里任何一道重复」,
+   * 两个数不是一个口径,混用会让提示条上的比例对不上触发拦截的那一套。
+   */
+  matchedSet: {
+    id: string;
+    title: string;
+    createdAt: number;
+    /** 与这一套重复的题数 */
+    duplicateCount: number;
+  } | null;
   /** 逐题命中记录 */
   hits: JobDedupeHit[];
 }
+
+/** 生成引擎 —— 模型路径还是本地兜底 */
+export type QuestionProvider = "minimax" | "local";
 
 /** 难度档 1-4 */
 export type QuestionDifficulty = 1 | 2 | 3 | 4;
@@ -137,6 +152,13 @@ export interface InterviewJob {
   resultSkipped?: number;
   /** 跨套判重结果(#22)—— 生成时算的,前端拿它出「整套高度重复」提示条 */
   dedupe?: JobDedupeResult;
+  /**
+   * 这套题是谁生成的 —— 入库时原样写进题库的 provider 字段。
+   *
+   * 单独存一项,而不是从 engineNote 的文案里反推:文案是给人看的,
+   * 改一个字就可能让入库的来源标错。
+   */
+  provider?: QuestionProvider;
   /** 引擎说明(比如走了本地兜底) */
   engineNote?: string;
   error?: string;
