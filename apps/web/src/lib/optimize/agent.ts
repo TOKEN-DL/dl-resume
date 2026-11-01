@@ -21,7 +21,8 @@ import type {
   PlanItem,
 } from "./types";
 import { localProvider } from "./providers/local";
-import { hasMiniMaxKey, minimaxProvider } from "./providers/minimax";
+import { hasMiniMaxKey } from "@/lib/llm/chat";
+import { minimaxProvider } from "./providers/minimax";
 import type { OptimizeProvider } from "./providers/provider";
 
 export interface ProviderChoice {
