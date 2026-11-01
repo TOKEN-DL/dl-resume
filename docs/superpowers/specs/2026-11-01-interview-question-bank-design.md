@@ -420,39 +420,64 @@ DELETE /api/questions?setId=<setId>  删除整套
 ```
 prisma/migrations/<时间戳>_add_question_bank/migration.sql   ← 目录名由 prisma migrate dev 自动生成
 
-src/lib/interview/types.ts              类型：Question / QuestionSet / Difficulty / Category / JobState
+src/lib/interview/types.ts              共享类型：题目 / 套 / 节点 / 判重结果 / provider
+src/lib/interview/difficulty.ts         难度与分类的类型 + 四档标签 + normalizeDifficulty（零依赖正本）
 src/lib/interview/stages.ts             5 个节点定义 + MIN_STAGE_MS
+src/lib/interview/stages.test.ts
 src/lib/interview/fingerprint.ts        normalize / fingerprint / bigrams / similarity
 src/lib/interview/fingerprint.test.ts
 src/lib/interview/dedupe.ts             题级三规则 + 套级拦截
 src/lib/interview/dedupe.test.ts
+src/lib/interview/cross-dedupe.ts       跨套判重编排（取库 → 逐题比 → 按套算重复率）
+src/lib/interview/cross-dedupe.test.ts
 src/lib/interview/generator.ts          prompt 构造 + 模型调用 + 解析 + 本地兜底
 src/lib/interview/generator.test.ts
 src/lib/interview/job-store.ts          globalThis 任务表
+src/lib/interview/job-store.test.ts
 src/lib/interview/runner.ts             节点推进
+src/lib/interview/runner.test.ts
 src/lib/interview/repo.ts               Prisma 题库读写（list / insert / star / delete）
 src/lib/interview/repo.test.ts
+src/lib/interview/serialize.ts          题库对外形状（API 两处共用一份）
 
 src/lib/llm/chat.ts                      共享模型客户端：chat() / extractJson() / stripThinking()
                                          （从 optimize/providers/minimax.ts 抽出，两边共用）
+src/lib/llm/chat.test.ts
 
 src/app/api/interview/route.ts
+src/app/api/interview/route.test.ts
 src/app/api/interview/[jobId]/route.ts
+src/app/api/interview/[jobId]/route.test.ts
 src/app/api/interview/[jobId]/confirm/route.ts
+src/app/api/interview/[jobId]/confirm/route.test.ts
 src/app/api/questions/route.ts
+src/app/api/questions/route.test.ts
 src/app/api/questions/[id]/route.ts
+src/app/api/questions/[id]/route.test.ts
 
 src/app/interview/page.tsx
+src/app/interview/page.module.css
 src/app/questions/page.tsx
+src/app/questions/page.module.css
 
 src/components/interview/interview-workspace.tsx
+src/components/interview/interview-workspace.test.tsx
 src/components/interview/source-picker.tsx
+src/components/interview/source-picker.test.tsx
 src/components/interview/progress-panel.tsx
+src/components/interview/progress-panel.test.tsx
 src/components/interview/question-card.tsx
+src/components/interview/question-card.test.tsx
 src/components/interview/interview.module.css
 
 src/components/questions/question-bank.tsx
+src/components/questions/question-bank.test.tsx
 src/components/questions/questions.module.css
+
+scripts/seed-questions.ts                 题库种子脚本（--email / --id，可重复跑）
+
+playwright.config.ts                       e2e 配置（独立端口 + 独立 SQLite 库）
+e2e/**                                     全链路用例与脚手架
 ```
 
 ### 改动
@@ -462,8 +487,11 @@ src/components/questions/questions.module.css
 | `prisma/schema.prisma` | 加 2 个 model + `User` 关系字段 |
 | `src/components/site-nav/site-nav.tsx` | `PRIMARY_LINKS` +1 项 |
 | `src/lib/optimize/job-store.ts` | 注释「项目当前禁止新增 Prisma 迁移」已不成立，改掉 |
+| `src/lib/interview/job-store.ts` | 同上（同一段过时注释的两份拷贝） |
 | `src/lib/optimize/providers/minimax.ts` | `chat()` / `extractJson()` / `stripThinking()` 移到 `src/lib/llm/chat.ts`，这里改为引用 |
 | `src/lib/optimize/providers/minimax.test.ts` | 跟着 import 路径调整，测试逻辑不变 |
+| `apps/web/package.json` | 加 `e2e` / `e2e:setup` / `e2e:report` 脚本 |
+| `.gitignore` | 忽略 `.scratch/` 与 e2e 专用的 SQLite 库 |
 
 ---
 
