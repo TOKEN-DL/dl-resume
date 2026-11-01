@@ -25,23 +25,28 @@ import { getJob, getJobData, updateJob } from "./job-store";
 import { listQuestionItems } from "./repo";
 import { dedupeAgainstLibrary, loadLibrary, toJobDedupe } from "./cross-dedupe";
 import { MIN_STAGE_MS, STAGES } from "./stages";
-import type { InterviewJob, InterviewQuestion, StageState } from "./types";
+import type {
+  InterviewJob,
+  InterviewQuestion,
+  InterviewStageKey,
+  StageState,
+} from "./types";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function stageOf(job: InterviewJob, key: string): StageState {
+function stageOf(job: InterviewJob, key: InterviewStageKey): StageState {
   let s = job.stages.find((x) => x.key === key);
   if (!s) {
-    s = { key: key as StageState["key"], status: "pending" };
+    s = { key, status: "pending" };
     job.stages.push(s);
   }
   return s;
 }
 
 /** 进入节点 */
-function beginStage(job: InterviewJob, key: string): void {
+function beginStage(job: InterviewJob, key: InterviewStageKey): void {
   const s = stageOf(job, key);
   s.status = "running";
   s.startedAt = Date.now();
@@ -59,7 +64,7 @@ function beginStage(job: InterviewJob, key: string): void {
  */
 async function endStage(
   job: InterviewJob,
-  key: string,
+  key: InterviewStageKey,
   detail: string,
 ): Promise<void> {
   const s = stageOf(job, key);
@@ -73,7 +78,7 @@ async function endStage(
   updateJob(job.id, {});
 }
 
-function failStage(job: InterviewJob, key: string, error: string): void {
+function failStage(job: InterviewJob, key: InterviewStageKey, error: string): void {
   const s = stageOf(job, key);
   s.status = "failed";
   s.error = error;
@@ -129,6 +134,8 @@ export async function runJob(jobId: string): Promise<void> {
     const alreadyAsked = await listAskedQuestions(job.userId, job.source.resumeId);
     const generated = await generateQuestions(source, alreadyAsked);
     if (generated.engineNote) notes.push(generated.engineNote);
+    // 谁出的题 —— 入库时原样写进题库的 provider 字段
+    updateJob(jobId, { provider: generated.provider });
     await endStage(job, "generate", `生成 ${generated.questions.length} 道题`);
 
     /* ── 3. 查重(套内 + 跨套) ─────────────────────────────────── */
@@ -139,7 +146,10 @@ export async function runJob(jobId: string): Promise<void> {
     const library = await loadLibrary(job.userId);
     const cross = dedupeAgainstLibrary(kept, library);
     updateJob(jobId, { dedupe: toJobDedupe(cross) });
-    await endStage(job, "dedupe", `跳过 ${skipped + cross.duplicateCount} 道重复题`);
+    // 这里只是**标出**重复题,还没跳过 —— 重复题照样展示给用户看,
+    // 入库时才按题跳过(§4.4 的「跳过重复题后写入剩余题」),
+    // 二次确认层报的「跳过 N 题重复」才跟提示条上的数字对得上。
+    await endStage(job, "dedupe", `标出 ${skipped + cross.duplicateCount} 道重复题`);
 
     if (kept.length === 0) {
       throw new Error("这套题全部重复,换一份简历或稍后再试");

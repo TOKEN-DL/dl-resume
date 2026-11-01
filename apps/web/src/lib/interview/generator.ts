@@ -12,10 +12,12 @@
  */
 import { chat, extractJson, hasMiniMaxKey } from "@/lib/llm/chat";
 import { checkDuplicate, type DedupCandidate } from "./dedupe";
+import { fingerprint } from "./fingerprint";
 import type {
   GeneratedQuestion,
   QuestionCategory,
   QuestionDifficulty,
+  QuestionProvider,
 } from "./types";
 import type { ResumeData } from "@/lib/validation/resume";
 import { stripHeavyFields } from "@/lib/optimize/providers/provider";
@@ -126,18 +128,53 @@ const SLOTS: readonly Slot[] = [
  * 模板题不编造简历里没有的东西 —— 问句问的是「你」做过什么,
  * 答案提纲也只提醒用户自己组织语言,不给现成成果。
  *
- * avoidOffset:关键词池的起始偏移量,用来「避开已经出过的题」。
- * 模板是固定的,同一份简历再押一次会出一模一样的 12 道题;
- * 把关键词池转一格,题就换了一组搭配,不至于整套重复。
+ * usedQuestions:这份简历**已经出过的题干**。避让靠的是这些题干本身,
+ * 不是「已经出过几道题」。
+ *
+ * 为什么不能按题数轮转关键词池 —— 那看着省事,实际会撞死:
+ * 关键词池 6 个、已入库 12 题时,轮转量 12 % 6 = 0,
+ * 第二套跟第一套**一模一样**,用户从此再也押不出新题,题库里的题一道都没多。
+ * 池长是 3 / 4 / 6 / 12 时都会踩到(12 能被它们整除)。
+ *
+ * 所以这里按「槽位 × 关键词」的**组合**去重:每个槽位依次试池里的关键词,
+ * 挑第一个没出过的组合。组合空间 = 槽位数 × 关键词数(12 × 6 = 72),
+ * 够用户押好几轮。真用完了就退回原组合,由上层的套级判重去拦,
+ * 并如实告诉用户「这套与题库里已有的题高度重复」—— 不假装还能出新的。
  */
-export function buildLocalQuestions(scan: ScanResult, avoidOffset = 0): GeneratedQuestion[] {
+export function buildLocalQuestions(
+  scan: ScanResult,
+  usedQuestions: readonly string[] = [],
+): GeneratedQuestion[] {
   const pool = scan.keywords.length > 0 ? scan.keywords : ["项目经历"];
-  const offset = ((avoidOffset % pool.length) + pool.length) % pool.length;
+  // 已出过的题干的指纹 —— 归一化后比较,「请介绍一下X」与「X」算同一道
+  const used = new Set(
+    usedQuestions
+      .map((q) => (typeof q === "string" ? q.trim() : ""))
+      .filter(Boolean)
+      .map((q) => fingerprint(q)),
+  );
+
   return SLOTS.map((slot, i) => {
-    const kw = pool[(i + offset) % pool.length];
+    // 依次试池里的关键词,挑第一个**没出过**的组合;
+    // 全都用过了就退回第一个关键词 —— 重复交给上层判重去拦
+    let keyword = pool[i % pool.length];
+    let question = "";
+    for (let k = 0; k < pool.length; k++) {
+      const candidate = pool[(i + k) % pool.length];
+      const candidateQuestion = stripEmoji(slot.template.replace(/\{kw\}/g, candidate));
+      if (!used.has(fingerprint(candidateQuestion))) {
+        keyword = candidate;
+        question = candidateQuestion;
+        break;
+      }
+    }
+    if (!question) {
+      question = stripEmoji(slot.template.replace(/\{kw\}/g, keyword));
+    }
+
     return {
-      question: stripEmoji(slot.template.replace(/\{kw\}/g, kw)),
-      topic: stripEmoji(`${kw} ${slot.topicSuffix}`),
+      question,
+      topic: stripEmoji(`${keyword} ${slot.topicSuffix}`),
       category: slot.category,
       difficulty: slot.difficulty,
     };
@@ -393,6 +430,13 @@ export function dedupeWithinSet(questions: GeneratedQuestion[]): {
 
 export interface GenerateOutcome {
   questions: GeneratedQuestion[];
+  /**
+   * 这套题是谁出的 —— 入库时原样写进题库的 provider 字段。
+   *
+   * 显式返回,而不是让调用方去猜 engineNote 里有没有「本地兜底」四个字 ——
+   * 那是在拿文案当数据用,改一次文案就错一次。
+   */
+  provider: QuestionProvider;
   /** 引擎说明:走了兜底或降级时才有 */
   engineNote?: string;
 }
@@ -427,11 +471,11 @@ export async function generateQuestions(
 ): Promise<GenerateOutcome> {
   const scan = scanResume(data);
   const asked = existingQuestions.map((q) => q.trim()).filter(Boolean);
-  // 兜底模板是固定的:靠关键词池转格避开已经出过的题
-  const local = (): GeneratedQuestion[] => buildLocalQuestions(scan, asked.length);
+  // 兜底模板是固定的:靠「组合去重」避开已经出过的题
+  const local = (): GeneratedQuestion[] => buildLocalQuestions(scan, asked);
 
   if (!hasMiniMaxKey()) {
-    return { questions: local(), engineNote: LOCAL_ENGINE_NOTE };
+    return { questions: local(), provider: "local", engineNote: LOCAL_ENGINE_NOTE };
   }
 
   let raw: string;
@@ -441,13 +485,18 @@ export async function generateQuestions(
   } catch (e) {
     return {
       questions: local(),
+      provider: "local",
       engineNote: `${LOCAL_ENGINE_NOTE};模型调用失败:${errorText(e)}`,
     };
   }
 
   const parsed = parseQuestionPayload(raw);
   if (!parsed) {
-    return { questions: local(), engineNote: `${LOCAL_ENGINE_NOTE};模型输出无法解析` };
+    return {
+      questions: local(),
+      provider: "local",
+      engineNote: `${LOCAL_ENGINE_NOTE};模型输出无法解析`,
+    };
   }
   if (parsed.questions.length === 0) {
     throw new Error("模型没有生成出任何题目");
@@ -455,6 +504,7 @@ export async function generateQuestions(
 
   return {
     questions: parsed.questions,
+    provider: "minimax",
     engineNote: parsed.topicMissing ? TOPIC_MISSING_NOTE : undefined,
   };
 }

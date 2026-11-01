@@ -46,14 +46,12 @@ const bodySchema = z.object({
 });
 
 /**
- * 生成引擎 —— 任务里没单独存这一项,只能从「引擎说明」反推:
- * 走了本地兜底的说明里带「本地兜底」四个字。
+ * 生成引擎 —— 任务里存着,原样写进题库的 provider 字段。
+ *
+ * 不用从「引擎说明」的文案里反推:文案是给人看的,改一个字就可能把来源标错。
  */
-const LOCAL_ENGINE_MARK = "本地兜底";
-
-/** 从任务的引擎说明反推生成引擎 */
 function providerOf(job: InterviewJob): string {
-  return job.engineNote?.includes(LOCAL_ENGINE_MARK) ? "local" : "minimax";
+  return job.provider === "local" ? "local" : "minimax";
 }
 
 /** 入库计划:哪些题写进去,哪些题跳过 */

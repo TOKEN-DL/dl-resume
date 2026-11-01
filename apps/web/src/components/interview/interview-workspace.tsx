@@ -53,11 +53,18 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
    *
    * 任务里存着生成时算好的结论;入库时服务端又算了一遍(题库可能变了),
    * 以服务端返回的为准。
+   *
+   * 两个数字不是一个口径:
+   *   - `duplicateCount` —— 跟**题库里任何一道**重复的题数,用来估「还能入库几题」
+   *   - `matchedSetDuplicateCount` —— 跟**最像的那一套**重复的题数,提示条报的是它
+   *     (套级门槛就是按它算的,报全库数会让比例对不上触发拦截的那一套)
    */
   const [dupBlock, setDupBlock] = useState<{
     duplicateCount: number;
+    matchedSetDuplicateCount: number;
     totalCount: number;
     matchedSetTitle: string | null;
+    matchedSetCreatedAt: number | null;
   } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -210,8 +217,10 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
     if (!d?.isDuplicate) return null;
     return {
       duplicateCount: d.duplicateCount,
+      matchedSetDuplicateCount: d.matchedSet?.duplicateCount ?? d.duplicateCount,
       totalCount: d.totalCount,
       matchedSetTitle: d.matchedSet?.title ?? null,
+      matchedSetCreatedAt: d.matchedSet?.createdAt ?? null,
     };
   }, [dupBlock, job?.dedupe]);
 
@@ -278,8 +287,10 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
           // 服务端算出来的重复率更高 —— 把结论搬上提示条,让用户拍板
           setDupBlock({
             duplicateCount: body.duplicateCount ?? 0,
+            matchedSetDuplicateCount: body.matchedSet?.duplicateCount ?? body.duplicateCount ?? 0,
             totalCount: body.totalCount ?? 0,
             matchedSetTitle: body.matchedSet?.title ?? null,
+            matchedSetCreatedAt: body.matchedSet?.createdAt ?? null,
           });
           // 关掉二次确认层 —— 提示条上的「仍要入库」才是下一步
           setConfirmOpen(false);
@@ -358,8 +369,10 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
               <div className={styles.dpBannerBody}>
                 <p className={styles.dpBannerTitle}>这套与题库里已有的题高度重复</p>
                 <p className={styles.dpBannerText}>
-                  {dup.matchedSetTitle ? `与《${dup.matchedSetTitle}》那套` : "与题库里已有的题"}
-                  重复了 {dup.duplicateCount} / {dup.totalCount} 题 —— 默认整套不入库。
+                  {dup.matchedSetTitle
+                    ? `与《${dup.matchedSetTitle}》${formatSetDate(dup.matchedSetCreatedAt)}那套`
+                    : "与题库里已有的题"}
+                  重复了 {dup.matchedSetDuplicateCount} / {dup.totalCount} 题 —— 默认整套不入库。
                 </p>
               </div>
               <button
@@ -474,6 +487,20 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
       )}
     </div>
   );
+}
+
+/**
+ * 套的创建日期 —— 提示条要报「跟哪一天的那套重复」。
+ *
+ * 只到日就够:提示条是给人判断「是不是上次那套」用的,精确到秒没有意义。
+ * 拿不到日期就返回空串,提示条退化成「与《X》那套」,不显示一个假的日期。
+ */
+function formatSetDate(ts: number | null | undefined): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `;
 }
 
 export default InterviewWorkspace;
