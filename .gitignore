@@ -53,6 +53,7 @@ coverage/
 .tmp/
 .tmp-*/
 .tmp-*
+.scratch/
 .git-commit-msg.txt
 tools-scaffold/
 lint-out.txt
