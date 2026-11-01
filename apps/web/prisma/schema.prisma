@@ -21,6 +21,8 @@ model User {
 
   resumes       Resume[]
   encryptedDek  EncryptedDek?
+  questionSets  QuestionSet[]
+  questionItems QuestionItem[]
 
   @@map("users")
 }
@@ -55,4 +57,61 @@ model EncryptedDek {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("encrypted_deks")
+}
+
+/// 面试题库 —— 一次押题 = 一套 — 见 issue #17
+/// 单独建表是为了让「按批次取回整套题」变成一次索引查询:
+/// 套级判重要按 setId 取回整套来算重复率,不能每次在内存里 groupBy 全量题。
+model QuestionSet {
+  id          String   @id @default(cuid())
+  userId      String
+  /// 来源简历。存字符串不建外键:简历被删了题还在(题是用户资产,不该跟着简历消失)
+  resumeId    String?
+  resumeTitle String
+  /// 生成引擎:minimax / local
+  provider    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items QuestionItem[]
+
+  @@index([userId, createdAt])
+  @@map("question_sets")
+}
+
+/// 题库条目 —— 一道题 — 见 issue #17
+model QuestionItem {
+  id          String   @id @default(cuid())
+  userId      String
+  setId       String
+  /// 来源简历。存字符串不建外键:简历被删了题还在(题是用户资产,不该跟着简历消失)
+  resumeId    String?
+  resumeTitle String
+  /// 题干
+  question    String
+  /// 参考答案
+  answer      String
+  /// 考点关键词(模型给,2-4 个词),同考点即判重复
+  topic       String
+  /// basic | deep
+  category    String
+  /// 1-4,对应四档难度
+  difficulty  Int
+  /// 归一化指纹,查重用
+  fingerprint String
+  starred     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  set  QuestionSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, starred])
+  // 数据库层兜底:同一道题在同一用户下只能存在一份,跨套也不重复。
+  // 这是「不重复入库」这条需求的最后一道保险 —— 应用层 R1 判重是逻辑,
+  // 这个唯一索引是硬约束,并发写入也拦得住。
+  @@unique([userId, fingerprint])
+  @@map("question_items")
 }
