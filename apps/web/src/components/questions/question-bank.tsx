@@ -190,6 +190,7 @@ export function QuestionBank() {
       if (data.item) {
         setItems((cur) => cur.map((i) => (i.id === item.id ? { ...i, ...data.item } : i)));
       }
+      setError(null);
     } catch {
       setItems((cur) => cur.map((i) => (i.id === item.id ? { ...i, starred: previous } : i)));
       setError("收藏没存上,已经退回去了。");
@@ -210,6 +211,7 @@ export function QuestionBank() {
           )
           .filter((s) => s.count > 0),
       );
+      setError(null);
     } catch {
       setError("这道题没能删掉,再试一次。");
     }
@@ -224,6 +226,7 @@ export function QuestionBank() {
       if (!res.ok) throw new Error("bad status");
       setItems((cur) => cur.filter((i) => i.setId !== setId));
       setSets((cur) => cur.filter((s) => s.id !== setId));
+      setError(null);
     } catch {
       setError("这一套没能删掉,再试一次。");
     }
