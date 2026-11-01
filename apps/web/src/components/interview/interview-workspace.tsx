@@ -48,6 +48,17 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
   const [planFailed, setPlanFailed] = useState(false);
   /** 入库回执 —— 用来显示「已入库 N 题 → 去题库」 */
   const [saved, setSaved] = useState<{ inserted: number; skipped: number } | null>(null);
+  /**
+   * 跨套判重的拦截信息(#22)。
+   *
+   * 任务里存着生成时算好的结论;入库时服务端又算了一遍(题库可能变了),
+   * 以服务端返回的为准。
+   */
+  const [dupBlock, setDupBlock] = useState<{
+    duplicateCount: number;
+    totalCount: number;
+    matchedSetTitle: string | null;
+  } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -142,6 +153,7 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
       setQuestions([]);
       setStarred({});
       setSaved(null);
+      setDupBlock(null);
       setPhase("running");
       startPolling(body.job.id);
     } catch {
@@ -161,6 +173,7 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
     setQuestions([]);
     setStarred({});
     setSaved(null);
+    setDupBlock(null);
     setError(null);
     setPhase("source");
   }
@@ -185,6 +198,25 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
         .filter((n) => Number.isInteger(n) && n >= 0),
     [starred],
   );
+
+  /**
+   * 跨套判重的拦截结论 —— 整套高度重复时,整套不入库。
+   *
+   * 优先用服务端刚返回的(入库时算的那一遍),没有就用任务里生成时算好的。
+   */
+  const dup = useMemo(() => {
+    if (dupBlock) return dupBlock;
+    const d = job?.dedupe;
+    if (!d?.isDuplicate) return null;
+    return {
+      duplicateCount: d.duplicateCount,
+      totalCount: d.totalCount,
+      matchedSetTitle: d.matchedSet?.title ?? null,
+    };
+  }, [dupBlock, job?.dedupe]);
+
+  /** 「仍要入库」能留下几题 */
+  const keepCount = dup ? Math.max(0, dup.totalCount - dup.duplicateCount) : 0;
 
   /**
    * 打开二次确认层。
@@ -227,19 +259,40 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
    * 把「重点关注」的题目序号一起递上去 —— 入库时这些题直接落成收藏。
    * 重复点确认不会写第二份:服务端认得这个任务已经入过库,直接把上次的
    * 结果原样返回。
+   *
+   * force:用户点了「仍要入库」—— 整套被判高度重复时,由用户拍板,
+   * 只写入不重复的那几题。
    */
-  async function doConfirm() {
+  async function doConfirm(force = false) {
     if (!job) return;
     setConfirming(true);
     try {
       const r = await fetch(`/api/interview/${job.id}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ starredIndexes }),
+        body: JSON.stringify({ starredIndexes, ...(force ? { force: true } : {}) }),
       });
       const body = await r.json();
       if (!r.ok) {
-        setError(body?.error ?? "入库失败,请重试");
+        if (body?.error === "set_duplicate") {
+          // 服务端算出来的重复率更高 —— 把结论搬上提示条,让用户拍板
+          setDupBlock({
+            duplicateCount: body.duplicateCount ?? 0,
+            totalCount: body.totalCount ?? 0,
+            matchedSetTitle: body.matchedSet?.title ?? null,
+          });
+          // 关掉二次确认层 —— 提示条上的「仍要入库」才是下一步
+          setConfirmOpen(false);
+          setPlan(null);
+          setPlanFailed(false);
+          setError("这套与题库里已有的题高度重复 —— 要入库就点「仍要入库」,只保留不重复的题。");
+          return;
+        }
+        setError(
+          body?.error === "all_duplicate"
+            ? "这套题全部与题库重复,没有可入库的题。"
+            : (body?.error ?? "入库失败,请重试"),
+        );
         return;
       }
       setConfirmOpen(false);
@@ -300,6 +353,26 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
             </div>
           )}
 
+          {dup && !saved && (
+            <div className={styles.dpBanner} role="alert">
+              <div className={styles.dpBannerBody}>
+                <p className={styles.dpBannerTitle}>这套与题库里已有的题高度重复</p>
+                <p className={styles.dpBannerText}>
+                  {dup.matchedSetTitle ? `与《${dup.matchedSetTitle}》那套` : "与题库里已有的题"}
+                  重复了 {dup.duplicateCount} / {dup.totalCount} 题 —— 默认整套不入库。
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.dpBtn}
+                onClick={() => doConfirm(true)}
+                disabled={confirming}
+              >
+                仍要入库（只保留不重复的 {keepCount} 题）
+              </button>
+            </div>
+          )}
+
           <div className={styles.iwResultHead}>
             <div>
               <h2 className={styles.iwResultTitle}>押题完成</h2>
@@ -332,11 +405,15 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
           {!saved ? (
             <div className={styles.cfBar}>
               <p className={styles.cfHint}>
-                入库后这 {sorted.length} 道题就进题库了;勾了「重点关注」的会直接落成收藏。
+                {dup
+                  ? `整套高度重复,默认不入库 —— 要入库就点上面的「仍要入库」,只保留不重复的 ${keepCount} 题。`
+                  : `入库后这 ${sorted.length} 道题就进题库了;勾了「重点关注」的会直接落成收藏。`}
               </p>
-              <button type="button" className={styles.cfPrimaryBtn} onClick={openConfirm}>
-                确认入库题库
-              </button>
+              {!dup && (
+                <button type="button" className={styles.cfPrimaryBtn} onClick={openConfirm}>
+                  确认入库题库
+                </button>
+              )}
             </div>
           ) : (
             <div className={styles.cfDone} role="status">
@@ -386,7 +463,7 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
               <button
                 type="button"
                 className={styles.cfPrimaryBtn}
-                onClick={doConfirm}
+                onClick={() => doConfirm(false)}
                 disabled={confirming}
               >
                 {confirming ? "入库中…" : "确认入库"}

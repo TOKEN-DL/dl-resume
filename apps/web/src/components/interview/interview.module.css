@@ -843,3 +843,62 @@
   }
 }
 
+/* ─── 跨套判重提示条(#22) ───────────────────────────────────────
+   整套被判「高度重复」时出这条:说清跟哪一套重复、重复了几题,
+   并给一个「仍要入库」的逃生口 —— 误杀时由用户拍板。
+   颜色一律走既有设计令牌,不引入新色相。                          */
+
+.dpBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid var(--paper-edge);
+  border-left: 3px solid var(--blue);
+  border-radius: 10px;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.dpBannerBody {
+  flex: 1 1 280px;
+}
+
+.dpBannerTitle {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.dpBannerText {
+  margin: 0;
+}
+
+.dpBtn {
+  flex: none;
+  padding: 9px 16px;
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 160ms;
+}
+
+.dpBtn:hover:not(:disabled) {
+  background: var(--blue-deep);
+}
+
+.dpBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
