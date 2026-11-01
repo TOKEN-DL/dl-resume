@@ -62,6 +62,7 @@ export type InterviewJobStatus =
   | "queued"
   | "running"
   | "awaiting-confirm" // 跑完了,等用户确认(#21 才真正写库)
+  | "confirmed" // 已确认入库 —— 题已在题库里,重复确认不再写第二份
   | "failed"
   | "cancelled";
 
@@ -81,6 +82,12 @@ export interface InterviewJob {
   progress: number;
   /** 跑完后才有 */
   questions?: InterviewQuestion[];
+  /** 已入库的题库套 id(#21)—— 有值就说明这任务已经确认过,重复确认直接返回上次的结果 */
+  resultSetId?: string;
+  /** 上次入库实际写进去的题数(#21) */
+  resultInserted?: number;
+  /** 上次入库因重复被跳过的题数(#21) */
+  resultSkipped?: number;
   /** 引擎说明(比如走了本地兜底) */
   engineNote?: string;
   error?: string;
@@ -99,6 +106,12 @@ export interface InterviewJobSummary {
   currentStage?: InterviewStageKey;
   stages: StageState[];
   questions?: InterviewQuestion[];
+  /** 已入库的题库套 id(#21) */
+  resultSetId?: string;
+  /** 上次入库实际写进去的题数(#21) */
+  resultInserted?: number;
+  /** 上次入库因重复被跳过的题数(#21) */
+  resultSkipped?: number;
   engineNote?: string;
   error?: string;
   createdAt: number;
@@ -119,6 +132,9 @@ export function toInterviewJobSummary(job: InterviewJob): InterviewJobSummary {
     currentStage: running?.key,
     stages: job.stages,
     questions: job.questions,
+    resultSetId: job.resultSetId,
+    resultInserted: job.resultInserted,
+    resultSkipped: job.resultSkipped,
     engineNote: job.engineNote,
     error: job.error,
     createdAt: job.createdAt,
