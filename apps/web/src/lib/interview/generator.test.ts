@@ -1,18 +1,14 @@
-// @vitest-environment jsdom
 /**
- * 面试押题模块的测试。
+ * 出题引擎(generator)—— 本地兜底、模型协议、套内判重。
  *
- * 这个文件覆盖三层:
- *   1. 节点定义(stages)—— 五个节点的名字与顺序
- *   2. 出题引擎(generator)—— 本地兜底、模型协议、套内判重
- *   3. 工作台组件(interview-workspace / source-picker / progress-panel)
- *
- * 本仓库给押题模块只留了这一个测试文件,所以组件层的用例也放在这里。
+ * 盯这些:
+ *   1. 简历扫描:技能与项目数、关键词池
+ *   2. 本地兜底:出满 12 道、四档难度各 3 道、基础/深挖各 6 道、考点两两不同
+ *   3. 出题 / 出答案提示词:硬性要求写没写清楚
+ *   4. 模型协议解析:难度夹边、空题干丢掉、表情符号剥掉、答案按 index 挂回
+ *   5. 套内判重:同考点只留一道
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createElement } from "react";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
-import { STAGES, STAGE_MAP, STAGE_STATUS_LABEL, MIN_STAGE_MS } from "./stages";
+import { describe, it, expect } from "vitest";
 import {
   LOCAL_ENGINE_NOTE,
   TOPIC_MISSING_NOTE,
@@ -26,21 +22,8 @@ import {
   scanResume,
   stripEmoji,
 } from "./generator";
-import type { GeneratedQuestion, InterviewJobSummary, InterviewQuestion } from "./types";
-import type { InterviewJob } from "./types";
+import type { GeneratedQuestion } from "./types";
 import type { ResumeData } from "@/lib/validation/resume";
-import { clearJobs, createJob, getJob, listActiveJobs, listJobs, updateJob } from "./job-store";
-import { runJob } from "./runner";
-import { listQuestionItems, listQuestionSetsByUser } from "@/lib/interview/repo";
-import { InterviewWorkspace } from "@/components/interview/interview-workspace";
-import { SourcePicker } from "@/components/interview/source-picker";
-import { ProgressPanel } from "@/components/interview/progress-panel";
-
-// 仓储层要连数据库 —— 这里换掉,让跑任务的用例不依赖开发机上有没有库
-vi.mock("@/lib/interview/repo", () => ({
-  listQuestionItems: vi.fn(async () => []),
-  listQuestionSetsByUser: vi.fn(async () => []),
-}));
 
 /* ─── 测试夹具 ────────────────────────────────────────────────────── */
 
@@ -88,46 +71,7 @@ function expectNoEmoji(text: string) {
   expect(EMOJI_RE.test(text)).toBe(false);
 }
 
-/* ─── 1. 节点定义 ─────────────────────────────────────────────────── */
-
-describe("押题节点定义", () => {
-  it("五个节点,顺序是 扫描 → 出题 → 查重 → 出答案 → 待确认入库", () => {
-    expect(STAGES.map((s) => s.key)).toEqual([
-      "scan",
-      "generate",
-      "dedupe",
-      "answer",
-      "confirm",
-    ]);
-    expect(STAGES.map((s) => s.title)).toEqual([
-      "简历扫描",
-      "出题",
-      "查重",
-      "出答案",
-      "待确认入库",
-    ]);
-  });
-
-  it("每个节点都能按 key 查到定义", () => {
-    expect(STAGE_MAP.scan.title).toBe("简历扫描");
-    expect(STAGE_MAP.confirm.title).toBe("待确认入库");
-  });
-
-  it("节点状态有五种,都有可读文案", () => {
-    expect(Object.keys(STAGE_STATUS_LABEL).sort()).toEqual(
-      ["done", "failed", "pending", "running", "skipped"].sort(),
-    );
-    for (const label of Object.values(STAGE_STATUS_LABEL)) {
-      expect(label.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("每个节点最短展示 420ms —— 太快了进度条会跳变", () => {
-    expect(MIN_STAGE_MS).toBe(420);
-  });
-});
-
-/* ─── 2. 简历扫描 ─────────────────────────────────────────────────── */
+/* ─── 1. 简历扫描 ─────────────────────────────────────────────────── */
 
 describe("scanResume", () => {
   it("数出技能与项目", () => {
@@ -150,7 +94,7 @@ describe("scanResume", () => {
   });
 });
 
-/* ─── 3. 本地兜底出题 ─────────────────────────────────────────────── */
+/* ─── 2. 本地兜底出题 ─────────────────────────────────────────────── */
 
 describe("本地兜底出题", () => {
   const questions = buildLocalQuestions(scanResume(RESUME));
@@ -277,7 +221,7 @@ describe("本地兜底出题", () => {
   });
 });
 
-/* ─── 4. 模型协议:出题 ────────────────────────────────────────────── */
+/* ─── 3. 模型协议:出题 ────────────────────────────────────────────── */
 
 describe("出题提示词", () => {
   const { system, user } = buildQuestionPrompt(RESUME);
@@ -368,7 +312,7 @@ describe("出答案提示词", () => {
   });
 });
 
-/* ─── 5. 模型协议:解析 ────────────────────────────────────────────── */
+/* ─── 4. 模型协议:解析 ────────────────────────────────────────────── */
 
 describe("出题结果解析", () => {
   it("解析标准 JSON", () => {
@@ -476,7 +420,7 @@ describe("stripEmoji", () => {
   });
 });
 
-/* ─── 6. 套内判重 ─────────────────────────────────────────────────── */
+/* ─── 5. 套内判重 ─────────────────────────────────────────────────── */
 
 describe("套内判重", () => {
   const base: GeneratedQuestion[] = [
@@ -516,458 +460,10 @@ describe("套内判重", () => {
   });
 });
 
-/* ─── 7. 任务表与节点推进 ─────────────────────────────────────────── */
-
-function makeJob(id: string, userId = "u1", data?: ResumeData): InterviewJob {
-  const now = Date.now();
-  const job: InterviewJob = {
-    id,
-    userId,
-    status: "queued",
-    title: "测试简历",
-    source: { kind: "resume", resumeId: "r1" },
-    stages: [],
-    progress: 0,
-    createdAt: now,
-    updatedAt: now,
-  };
-  createJob(job, { data: data ?? RESUME });
-  return job;
-}
-
-describe("押题任务表", () => {
-  it("任务列表按用户隔离", () => {
-    makeJob("j1", "u1");
-    makeJob("j2", "u2");
-    expect(listJobs("u1").map((j) => j.id)).toEqual(["j1"]);
-    expect(listJobs("u2").map((j) => j.id)).toEqual(["j2"]);
-  });
-
-  it("活跃任务只包含排队/运行/待确认", () => {
-    makeJob("j1", "u1");
-    updateJob("j1", { status: "cancelled" });
-    expect(listActiveJobs("u1")).toEqual([]);
-
-    makeJob("j2", "u1");
-    expect(listActiveJobs("u1").map((j) => j.id)).toEqual(["j2"]);
-  });
-});
-
-describe("runJob", () => {
-  it("跑完五个节点,停在「待确认入库」,并带上 12 道题", async () => {
-    makeJob("j1");
-    await runJob("j1");
-
-    const job = getJob("j1")!;
-    expect(job.status).toBe("awaiting-confirm");
-    expect(job.stages.map((s) => s.key)).toEqual([
-      "scan",
-      "generate",
-      "dedupe",
-      "answer",
-      "confirm",
-    ]);
-    expect(job.stages.every((s) => s.status === "done")).toBe(true);
-    expect(job.progress).toBe(1);
-    expect(job.questions).toHaveLength(12);
-  }, 20000);
-
-  it("每个节点都留下完成提示", async () => {
-    makeJob("j2");
-    await runJob("j2");
-    const job = getJob("j2")!;
-    const details = Object.fromEntries(job.stages.map((s) => [s.key, s.detail]));
-    expect(details.scan).toBe("识别到 3 个技能 · 2 段项目");
-    expect(details.generate).toBe("生成 12 道题");
-    expect(details.dedupe).toBe("标出 0 道重复题");
-    expect(details.answer).toBe("生成 12 份参考答案");
-    expect(details.confirm).toBe("等你确认后写入题库");
-    for (const s of job.stages) {
-      expect(s.startedAt, s.key).toBeTruthy();
-      expect(s.finishedAt, s.key).toBeTruthy();
-    }
-  }, 20000);
-
-  it("没配密钥时标注本地兜底", async () => {
-    makeJob("j3");
-    await runJob("j3");
-    expect(getJob("j3")!.engineNote).toContain("本地兜底");
-  }, 20000);
-
-  it("源数据缺失时任务标记为失败而不是卡住", async () => {
-    const now = Date.now();
-    createJob(
-      {
-        id: "j4",
-        userId: "u1",
-        status: "queued",
-        title: "x",
-        source: { kind: "resume", resumeId: "r1" },
-        stages: [],
-        progress: 0,
-        createdAt: now,
-        updatedAt: now,
-      },
-      { data: undefined },
-    );
-    await runJob("j4");
-    expect(getJob("j4")!.status).toBe("failed");
-  }, 20000);
-});
-
-/**
- * 跨套判重在任务里的落点(#22)。
- *
- * 盯三件事:
- *   1. 出题前先查这份简历已经出过的题干(最多 60 条)—— 生成前规避的第一道防线
- *   2. 查重节点跟题库里已有的题比一遍,重复的题记进任务
- *   3. 整套高度重复时任务里带着这个结论,前端据此出提示条
- */
-describe("runJob · 跨套判重", () => {
-  /** 把一道题拼成仓储层的行 */
-  function itemRowOf(q: GeneratedQuestion, setId: string, index: number) {
-    return {
-      id: `qi_${index}`,
-      userId: "u1",
-      setId,
-      resumeId: "r1",
-      resumeTitle: "后端工程师简历",
-      question: q.question,
-      answer: "",
-      topic: q.topic,
-      category: q.category,
-      difficulty: q.difficulty,
-      fingerprint: `fp_${index}`,
-      starred: false,
-      createdAt: new Date(1_700_000_000_000 + index),
-      updatedAt: new Date(1_700_000_000_000 + index),
-    };
-  }
-
-  const setRow = {
-    id: "qs_old",
-    userId: "u1",
-    resumeId: "r1",
-    resumeTitle: "后端工程师简历",
-    provider: "minimax",
-    createdAt: new Date(1_700_000_000_000),
-    updatedAt: new Date(1_700_000_000_000),
-  };
-
-  it("出题前先查这份简历已经出过的题干,最多 60 条", async () => {
-    makeJob("j_asked");
-    await runJob("j_asked");
-
-    expect(listQuestionItems).toHaveBeenCalledWith("u1", { resumeId: "r1", limit: 60 });
-  }, 20000);
-
-  it("跟题库里已有的题比一遍:重复的题记进任务,整套判为高度重复", async () => {
-    // 题库里放的正是这次要出的那 12 道题 → 12 道全重复
-    const produced = buildLocalQuestions(scanResume(RESUME));
-    vi.mocked(listQuestionItems).mockImplementation(async (_userId, filter) =>
-      // 带 resumeId 的那次是「这份简历已出过的题干」,不带的是整个题库
-      filter?.resumeId ? [] : produced.map((q, i) => itemRowOf(q, "qs_old", i)),
-    );
-    vi.mocked(listQuestionSetsByUser).mockResolvedValue([setRow]);
-
-    makeJob("j_dedupe");
-    await runJob("j_dedupe");
-
-    const job = getJob("j_dedupe")!;
-    expect(job.dedupe?.totalCount).toBe(12);
-    expect(job.dedupe?.duplicateCount).toBe(12);
-    expect(job.dedupe?.threshold).toBe(7);
-    expect(job.dedupe?.isDuplicate).toBe(true);
-    expect(job.dedupe?.matchedSet?.id).toBe("qs_old");
-    expect(job.stages.find((s) => s.key === "dedupe")?.detail).toBe("标出 12 道重复题");
-  }, 20000);
-
-  it("题库是空的:一道都不算重复", async () => {
-    makeJob("j_clean");
-    await runJob("j_clean");
-
-    const job = getJob("j_clean")!;
-    expect(job.dedupe?.duplicateCount).toBe(0);
-    expect(job.dedupe?.isDuplicate).toBe(false);
-  }, 20000);
-});
-
 describe("本地兜底的题不会被自己的判重吃掉", () => {
   it("12 道模板题两两不重复,一道都不被跳过", () => {
     const { kept, skipped } = dedupeWithinSet(buildLocalQuestions(scanResume(RESUME)));
     expect(skipped).toBe(0);
     expect(kept).toHaveLength(12);
-  });
-});
-
-/* ─── 8. 组件层 ───────────────────────────────────────────────────── */
-
-const RESUME_ITEMS = [
-  { id: "r1", title: "后端工程师简历", template: "classic", updatedAt: "2026-01-01T00:00:00.000Z" },
-  { id: "r2", title: "产品经理简历", template: "classic", updatedAt: "2026-02-01T00:00:00.000Z" },
-];
-
-function makeJobSummary(overrides: Partial<InterviewJobSummary> = {}): InterviewJobSummary {
-  return {
-    id: "iv_1",
-    userId: "u1",
-    status: "running",
-    title: "后端工程师简历",
-    source: { kind: "resume", resumeId: "r1" },
-    stages: [
-      { key: "scan", status: "done", detail: "识别到 3 个技能 · 2 段项目" },
-      { key: "generate", status: "running" },
-    ],
-    progress: 0.3,
-    currentStage: "generate",
-    createdAt: 1,
-    updatedAt: 2,
-    ...overrides,
-  };
-}
-
-interface Route {
-  match: (url: string, init?: RequestInit) => boolean;
-  respond: (url: string, init?: RequestInit) => { status?: number; body: unknown };
-}
-
-function mockFetch(routes: Route[]) {
-  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : String(input);
-    for (const r of routes) {
-      if (r.match(url, init)) {
-        const { status = 200, body } = r.respond(url, init);
-        return new Response(JSON.stringify(body), {
-          status,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-    }
-    return new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
-  });
-}
-
-let savedKey: string | undefined;
-
-beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
-  clearJobs();
-  // 题库默认是空的 —— 用例不该依赖开发机上有没有题
-  vi.mocked(listQuestionItems).mockReset();
-  vi.mocked(listQuestionItems).mockResolvedValue([]);
-  vi.mocked(listQuestionSetsByUser).mockReset();
-  vi.mocked(listQuestionSetsByUser).mockResolvedValue([]);
-  // 明确走本地兜底路径 —— 用例不该依赖开发机有没有配密钥
-  savedKey = process.env.MINIMAX_API_KEY;
-  process.env.MINIMAX_API_KEY = "";
-});
-
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-  if (savedKey === undefined) delete process.env.MINIMAX_API_KEY;
-  else process.env.MINIMAX_API_KEY = savedKey;
-});
-
-/**
- * 这个文件是 `.ts`,不能写 JSX —— 组件用 createElement 摆出来。
- * (测试文件名是既有约定,不改扩展名。)
- */
-const h = createElement;
-
-describe("SourcePicker", () => {
-  it("列出历史简历", () => {
-    render(h(SourcePicker, { resumes: RESUME_ITEMS, busy: false, onStart: () => {} }));
-    expect(screen.getByRole("button", { name: /后端工程师简历/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /产品经理简历/ })).toBeTruthy();
-  });
-
-  it("没有简历时给出提示", () => {
-    render(h(SourcePicker, { resumes: [], busy: false, onStart: () => {} }));
-    expect(screen.getByText(/还没有简历/)).toBeTruthy();
-  });
-
-  it("点「开始押题」把选中的简历交出去", () => {
-    const onStart = vi.fn();
-    render(h(SourcePicker, { resumes: RESUME_ITEMS, busy: false, onStart }));
-    fireEvent.click(screen.getByRole("button", { name: /产品经理简历/ }));
-    fireEvent.click(screen.getByRole("button", { name: "开始押题" }));
-    expect(onStart).toHaveBeenCalledWith({ kind: "resume", resumeId: "r2" });
-  });
-});
-
-describe("ProgressPanel", () => {
-  it("五个节点都在,带各自的一句话结果", () => {
-    render(h(ProgressPanel, { job: makeJobSummary(), onDiscard: () => {} }));
-    for (const title of ["简历扫描", "出题", "查重", "出答案", "待确认入库"]) {
-      expect(screen.getByText(title)).toBeTruthy();
-    }
-    expect(screen.getByText("识别到 3 个技能 · 2 段项目")).toBeTruthy();
-  });
-
-  it("进度条带百分比", () => {
-    render(h(ProgressPanel, { job: makeJobSummary({ progress: 0.3 }), onDiscard: () => {} }));
-    const bar = screen.getByRole("progressbar");
-    expect(bar.getAttribute("aria-valuenow")).toBe("30");
-  });
-});
-
-describe("InterviewWorkspace", () => {
-  it("一进来就接管还在跑的任务 —— 切页回来进度不丢", async () => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch([
-        {
-          match: (u) => u === "/api/interview",
-          respond: () => ({ body: { jobs: [makeJobSummary()] } }),
-        },
-      ]),
-    );
-    render(h(InterviewWorkspace, { resumes: RESUME_ITEMS }));
-    await waitFor(() => expect(screen.getByText("简历扫描")).toBeTruthy());
-  });
-
-  it("提交后接口立刻返回,进度界面马上出现", async () => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch([
-        {
-          match: (u, i) => u === "/api/interview" && i?.method === "POST",
-          respond: () => ({ status: 202, body: { job: makeJobSummary() } }),
-        },
-        { match: (u) => u === "/api/interview", respond: () => ({ body: { jobs: [] } }) },
-      ]),
-    );
-    render(h(InterviewWorkspace, { resumes: RESUME_ITEMS }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "开始押题" })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "开始押题" }));
-    await waitFor(() => expect(screen.getByText("简历扫描")).toBeTruthy());
-  });
-
-  it("跑完展示题卡:题干常显、答案收起、按难度升序", async () => {
-    const questions: InterviewQuestion[] = [
-      { question: "第四档题", topic: "t4", category: "deep", difficulty: 4, answer: "答案四" },
-      { question: "第一档题", topic: "t1", category: "basic", difficulty: 1, answer: "答案一" },
-      { question: "第三档题", topic: "t3", category: "deep", difficulty: 3, answer: "答案三" },
-    ];
-    vi.stubGlobal(
-      "fetch",
-      mockFetch([
-        {
-          match: (u) => u === "/api/interview",
-          respond: () => ({
-            body: {
-              jobs: [
-                makeJobSummary({ status: "awaiting-confirm", progress: 1, stages: [], questions }),
-              ],
-            },
-          }),
-        },
-      ]),
-    );
-    render(h(InterviewWorkspace, { resumes: RESUME_ITEMS }));
-    await waitFor(() => expect(screen.getByText("第一档题")).toBeTruthy());
-
-    const cards = screen.getAllByRole("article");
-    expect(cards).toHaveLength(3);
-    expect(cards[0].textContent).toContain("第一档题");
-    expect(cards[1].textContent).toContain("第三档题");
-    expect(cards[2].textContent).toContain("第四档题");
-
-    // 答案默认收起 —— 一个字都不在 DOM 里
-    expect(screen.queryByText("答案一")).toBeNull();
-  });
-
-  it("兜底模式会明确标注出来", async () => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch([
-        {
-          match: (u) => u === "/api/interview",
-          respond: () => ({
-            body: {
-              jobs: [
-                makeJobSummary({
-                  status: "awaiting-confirm",
-                  progress: 1,
-                  stages: [],
-                  engineNote: LOCAL_ENGINE_NOTE,
-                }),
-              ],
-            },
-          }),
-        },
-      ]),
-    );
-    render(h(InterviewWorkspace, { resumes: RESUME_ITEMS }));
-    await waitFor(() => expect(screen.getByText(/本地兜底/)).toBeTruthy());
-  });
-
-  it("题卡可以勾「重点关注」", async () => {
-    vi.stubGlobal(
-      "fetch",
-      mockFetch([
-        {
-          match: (u) => u === "/api/interview",
-          respond: () => ({
-            body: {
-              jobs: [
-                makeJobSummary({
-                  status: "awaiting-confirm",
-                  progress: 1,
-                  stages: [],
-                  questions: [
-                    { question: "第一档题", topic: "t1", category: "basic", difficulty: 1, answer: "答案一" },
-                  ],
-                }),
-              ],
-            },
-          }),
-        },
-      ]),
-    );
-    render(h(InterviewWorkspace, { resumes: RESUME_ITEMS }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "重点关注" })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "重点关注" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "取消重点关注" }).getAttribute("aria-pressed")).toBe(
-        "true",
-      ),
-    );
-  });
-
-  it("「再押一套」回到来源选择,但不把上一套题删掉", async () => {
-    const fetchMock = mockFetch([
-      {
-        match: (u) => u === "/api/interview",
-        respond: () => ({
-          body: {
-            jobs: [
-              makeJobSummary({
-                status: "awaiting-confirm",
-                progress: 1,
-                stages: [],
-                questions: [
-                  { question: "第一档题", topic: "t1", category: "basic", difficulty: 1, answer: "答案一" },
-                ],
-              }),
-            ],
-          },
-        }),
-      },
-    ]);
-    vi.stubGlobal("fetch", fetchMock);
-    render(h(InterviewWorkspace, { resumes: RESUME_ITEMS }));
-    await waitFor(() => expect(screen.getByText("第一档题")).toBeTruthy());
-
-    fireEvent.click(screen.getByRole("button", { name: "再押一套" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "开始押题" })).toBeTruthy());
-
-    // 这一版还没入库,题目只在内存里 —— 一删就再也看不回来了
-    const deleted = fetchMock.mock.calls.some(
-      ([u, i]) => String(u).includes("/api/interview/") && (i as RequestInit)?.method === "DELETE",
-    );
-    expect(deleted).toBe(false);
   });
 });

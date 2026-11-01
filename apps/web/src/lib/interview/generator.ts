@@ -12,6 +12,7 @@
  */
 import { chat, extractJson, hasMiniMaxKey } from "@/lib/llm/chat";
 import { checkDuplicate, type DedupCandidate } from "./dedupe";
+import { normalizeDifficulty } from "./difficulty";
 import { fingerprint } from "./fingerprint";
 import type {
   GeneratedQuestion,
@@ -309,15 +310,6 @@ export function buildAnswerPrompt(
 }
 
 /* ─── 4. 模型协议:解析 ────────────────────────────────────────────── */
-
-/** 难度夹到 1-4;认不出来的按 1 算 */
-function normalizeDifficulty(value: unknown): QuestionDifficulty {
-  const n = typeof value === "number" ? Math.round(value) : Number(value);
-  if (!Number.isFinite(n)) return 1;
-  if (n <= 1) return 1;
-  if (n >= 4) return 4;
-  return n as QuestionDifficulty;
-}
 
 export interface ParsedQuestions {
   questions: GeneratedQuestion[];

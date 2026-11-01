@@ -17,6 +17,7 @@
  * 判定退化成确定性的字符串相等。
  */
 import { normalize, similarity } from "./fingerprint";
+import type { DedupRule } from "./types";
 
 /** R2 近似的相似度门槛 —— 换标点换措辞的微调要抓得住,换皮问法留给 R3 */
 export const SIMILARITY_THRESHOLD = 0.82;
@@ -24,8 +25,13 @@ export const SIMILARITY_THRESHOLD = 0.82;
 /** 套级重复率门槛 —— 本套题与某一套的重复题数占比达到它就算「整套高度重复」 */
 export const SET_DUPLICATE_RATIO = 0.55;
 
-/** 命中的规则 */
-export type DedupRule = "R1" | "R2" | "R3";
+/**
+ * 命中的规则 —— 正本在 types.ts,这里转发一份保持对外兼容。
+ *
+ * 放在 types.ts 是因为它是零依赖的类型:types.ts 会被客户端组件 import,
+ * 而本文件顺着 fingerprint.ts 摸到 node:crypto,不能被客户端那边链进来。
+ */
+export type { DedupRule };
 
 /** 参与判重的一道题:题干 + 考点 */
 export interface DedupCandidate {

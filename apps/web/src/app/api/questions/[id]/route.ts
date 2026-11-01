@@ -10,11 +10,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/session";
-import {
-  deleteQuestionItem,
-  setQuestionStar,
-  type QuestionItemRow,
-} from "@/lib/interview/repo";
+import { deleteQuestionItem, setQuestionStar } from "@/lib/interview/repo";
+import { serializeItem } from "@/lib/interview/serialize";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -24,23 +21,6 @@ const patchSchema = z.object({
   /** 目标收藏状态 —— 幂等开关 */
   starred: z.boolean(),
 });
-
-/** 题目 → 客户端形状 */
-function serializeItem(row: QuestionItemRow) {
-  return {
-    id: row.id,
-    setId: row.setId,
-    resumeId: row.resumeId,
-    resumeTitle: row.resumeTitle,
-    question: row.question,
-    answer: row.answer,
-    topic: row.topic,
-    category: row.category,
-    difficulty: row.difficulty,
-    starred: row.starred,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
 
 /**
  * 题目不存在(404)还是别人的题(403)?

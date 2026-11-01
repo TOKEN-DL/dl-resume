@@ -13,7 +13,7 @@
  */
 import { checkDuplicate, checkSetDuplicate, type DedupCandidate } from "./dedupe";
 import { listQuestionItems, listQuestionSetsByUser } from "./repo";
-import type { GeneratedQuestion, JobDedupeHit, JobDedupeResult, JobDedupRule } from "./types";
+import type { GeneratedQuestion, JobDedupeHit, JobDedupeResult } from "./types";
 
 /** 题库里的一道既有题:判重内容 + 它属于哪一套 */
 export interface LibraryItem extends DedupCandidate {
@@ -113,7 +113,7 @@ export function dedupeAgainstLibrary(
     duplicateIndexes.push(index);
     hits.push({
       index,
-      rule: hit.rule as JobDedupRule,
+      rule: hit.rule,
       similarity: hit.similarity,
       matchedQuestion: matched.question,
       matchedSetId: matched.setId,

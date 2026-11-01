@@ -20,6 +20,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuestionCard } from "@/components/interview/question-card";
+import { DIFFICULTY_LABELS } from "@/lib/interview/difficulty";
 import styles from "./questions.module.css";
 
 /** 一道题(与 /api/questions 的 items 元素同形) */
@@ -82,13 +83,11 @@ function providerLabel(provider: string): string {
   return provider;
 }
 
-/** 难度档的中文说法(与题卡组件一致) */
-const DIFFICULTY_OPTIONS: Array<[string, string]> = [
-  ["1", "入门理解"],
-  ["2", "熟练使用"],
-  ["3", "原理机制"],
-  ["4", "场景深挖"],
-];
+/** 难度档的中文说法 —— 与题卡组件共用同一份标签(difficulty.ts) */
+const DIFFICULTY_OPTIONS: Array<[string, string]> = ([1, 2, 3, 4] as const).map((d) => [
+  String(d),
+  DIFFICULTY_LABELS[d],
+]);
 
 /** 时间戳 → 本地时间 "YYYY-MM-DD HH:mm" */
 function formatDateTime(iso: string): string {

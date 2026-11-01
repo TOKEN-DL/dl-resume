@@ -15,8 +15,8 @@ import {
   deleteQuestionSet,
   listQuestionItems,
   listQuestionSetsByUser,
-  type QuestionItemRow,
 } from "@/lib/interview/repo";
+import { serializeItem } from "@/lib/interview/serialize";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -49,23 +49,6 @@ const FILTER_KEYS = ["setId", "resumeId", "category", "difficulty", "starred", "
 const deleteSetSchema = z.object({
   setId: z.string().trim().min(1),
 });
-
-/** 题目 → 客户端形状(Date 转 ISO 字符串,userId / fingerprint 不外泄) */
-function serializeItem(row: QuestionItemRow) {
-  return {
-    id: row.id,
-    setId: row.setId,
-    resumeId: row.resumeId,
-    resumeTitle: row.resumeTitle,
-    question: row.question,
-    answer: row.answer,
-    topic: row.topic,
-    category: row.category,
-    difficulty: row.difficulty,
-    starred: row.starred,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
 
 /** 读查询串,丢掉空值 */
 function readFilters(url: URL): Record<string, string> {
