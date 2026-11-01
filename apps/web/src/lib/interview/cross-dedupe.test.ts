@@ -173,6 +173,36 @@ describe("跨套判重 · 套级", () => {
     expect(res.matchedSet?.id).toBe("qs_many");
     expect(res.matchedSet?.title).toBe("多的那套");
   });
+
+  it("matchedSet 带的是**那一套**的重复数,不是全库重复数", () => {
+    // 两套的题干必须互不相同,否则一道题会同时算进两套的重复数里。
+    //   qs_many:8 道(A1~A8)  qs_few:4 道(B1~B4)  本套另加 1 道全新的
+    // 全库重复数 = 12,但提示条报的是「与 qs_many 那套重复了几题」,必须是 8。
+    // 门槛也是按 8/12 算的,报全库的 12 的话比例就跟触发拦截的那一套对不上了。
+    const a = Array.from({ length: 8 }, (_, i) => `A 类第 ${i + 1} 道`);
+    const b = Array.from({ length: 4 }, (_, i) => `B 类第 ${i + 1} 道`);
+    const library = [
+      ...a.map((q, i) => lib({ question: q, topic: `A${i + 1}`, setId: "qs_many", setTitle: "多的那套" })),
+      ...b.map((q, i) => lib({ question: q, topic: `B${i + 1}`, setId: "qs_few", setTitle: "少的那套" })),
+    ];
+    const candidates = [
+      ...a.map((q, i) => cand(q, `A${i + 1}`)),
+      ...b.map((q, i) => cand(q, `B${i + 1}`)),
+      cand("全新题目甲", "新甲"),
+    ];
+
+    const res = dedupeAgainstLibrary(candidates, library);
+
+    expect(res.duplicateCount).toBe(12);
+    expect(res.matchedSet?.id).toBe("qs_many");
+    expect(res.matchedSet?.duplicateCount).toBe(8);
+  });
+
+  it("matchedSet 带那一套的创建日期,提示条要报「跟哪天的那套重复」", () => {
+    const res = dedupeAgainstLibrary(set12(7), library12);
+
+    expect(res.matchedSet?.createdAt).toBe(1_700_000_000_000);
+  });
 });
 
 describe("toLibraryItems", () => {
