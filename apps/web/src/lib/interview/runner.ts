@@ -7,8 +7,8 @@
  *
  * 五个节点:
  *   scan    简历扫描 —— 抽技能关键词与项目
- *   generate 出题     —— 第一次模型调用(或本地兜底)
- *   dedupe  查重     —— 套内判重,本地计算,不调模型
+ *   generate 出题     —— 第一次模型调用(或本地兜底);带上「已出过的题」让模型避开
+ *   dedupe  查重     —— 套内 + 跨套判重,本地计算,不调模型
  *   answer  出答案   —— 第二次模型调用,只针对保留下来的题
  *   confirm 待确认入库 —— 等用户确认(#21 才真正写库)
  *
@@ -22,6 +22,8 @@ import {
   scanResume,
 } from "./generator";
 import { getJob, getJobData, updateJob } from "./job-store";
+import { listQuestionItems } from "./repo";
+import { dedupeAgainstLibrary, loadLibrary, toJobDedupe } from "./cross-dedupe";
 import { MIN_STAGE_MS, STAGES } from "./stages";
 import type { InterviewJob, InterviewQuestion, StageState } from "./types";
 
@@ -79,6 +81,20 @@ function failStage(job: InterviewJob, key: string, error: string): void {
   updateJob(job.id, {});
 }
 
+/** 已出过的题干最多取多少条 —— 太多会撑爆提示词,最近出的最可能再来一遍 */
+const ASKED_LIMIT = 60;
+
+/**
+ * 这份简历已经出过的题干(最近 60 条,按创建时间倒序)。
+ *
+ * 生成前规避的第一道防线:把清单喂给模型,让它绕开这些题。
+ * 只取这份简历的 —— 别的简历出的题不算「这份简历问过的」。
+ */
+async function listAskedQuestions(userId: string, resumeId: string): Promise<string[]> {
+  const rows = await listQuestionItems(userId, { resumeId, limit: ASKED_LIMIT });
+  return rows.map((r) => r.question).filter((q) => typeof q === "string" && q.trim());
+}
+
 /**
  * 跑一个押题任务。
  *
@@ -109,14 +125,21 @@ export async function runJob(jobId: string): Promise<void> {
 
     /* ── 2. 出题 ─────────────────────────────────────────────── */
     await beginStage(job, "generate");
-    const generated = await generateQuestions(source);
+    // 第一道防线(生成前规避):把这份简历已经出过的题干喂给模型,让它绕开
+    const alreadyAsked = await listAskedQuestions(job.userId, job.source.resumeId);
+    const generated = await generateQuestions(source, alreadyAsked);
     if (generated.engineNote) notes.push(generated.engineNote);
     await endStage(job, "generate", `生成 ${generated.questions.length} 道题`);
 
-    /* ── 3. 查重(套内) ───────────────────────────────────────── */
+    /* ── 3. 查重(套内 + 跨套) ─────────────────────────────────── */
     await beginStage(job, "dedupe");
     const { kept, skipped } = dedupeWithinSet(generated.questions);
-    await endStage(job, "dedupe", `跳过 ${skipped} 道重复题`);
+    // 第二道防线(生成后判定):跟题库里已有的题逐题比一遍。
+    // 比的是**整个题库**而不是这份简历的 —— 换一份简历也可能问出同一道题。
+    const library = await loadLibrary(job.userId);
+    const cross = dedupeAgainstLibrary(kept, library);
+    updateJob(jobId, { dedupe: toJobDedupe(cross) });
+    await endStage(job, "dedupe", `跳过 ${skipped + cross.duplicateCount} 道重复题`);
 
     if (kept.length === 0) {
       throw new Error("这套题全部重复,换一份简历或稍后再试");

@@ -125,11 +125,16 @@ const SLOTS: readonly Slot[] = [
  *
  * 模板题不编造简历里没有的东西 —— 问句问的是「你」做过什么,
  * 答案提纲也只提醒用户自己组织语言,不给现成成果。
+ *
+ * avoidOffset:关键词池的起始偏移量,用来「避开已经出过的题」。
+ * 模板是固定的,同一份简历再押一次会出一模一样的 12 道题;
+ * 把关键词池转一格,题就换了一组搭配,不至于整套重复。
  */
-export function buildLocalQuestions(scan: ScanResult): GeneratedQuestion[] {
+export function buildLocalQuestions(scan: ScanResult, avoidOffset = 0): GeneratedQuestion[] {
   const pool = scan.keywords.length > 0 ? scan.keywords : ["项目经历"];
+  const offset = ((avoidOffset % pool.length) + pool.length) % pool.length;
   return SLOTS.map((slot, i) => {
-    const kw = pool[i % pool.length];
+    const kw = pool[(i + offset) % pool.length];
     return {
       question: stripEmoji(slot.template.replace(/\{kw\}/g, kw)),
       topic: stripEmoji(`${kw} ${slot.topicSuffix}`),
@@ -172,8 +177,16 @@ function targetOf(data: ResumeData): string {
  *   - 每题必须带考点关键词,同一个考点只能出现一次(否则 R3 判重会自伤)
  *   - **绝不编造简历里没有的经历、公司、数字** —— 押题题库会被反复翻,
  *     编出来的题比没有题更糟
+ *
+ * existingQuestions 是这份简历**已经出过的题干**(生成前规避的第一道防线):
+ * 带上它,模型就会绕开这些题 —— 换一种问法、换一个考点都不行。
  */
-export function buildQuestionPrompt(data: ResumeData): { system: string; user: string } {
+export function buildQuestionPrompt(
+  data: ResumeData,
+  existingQuestions: readonly string[] = [],
+): { system: string; user: string } {
+  const asked = existingQuestions.map((q) => q.trim()).filter(Boolean);
+
   const system = [
     "你是一位资深技术面试官,正在针对候选人的简历出面试题。",
     "",
@@ -185,18 +198,32 @@ export function buildQuestionPrompt(data: ResumeData): { system: string; user: s
     "5. 题干里不要出现表情符号。",
     "6. 只输出 JSON,不要输出任何解释文字。输出格式:",
     '{"questions":[{"question":"题干","topic":"考点","category":"basic|deep","difficulty":1}]}',
-  ].join("\n");
+  ];
+
+  if (asked.length > 0) {
+    system.push(
+      "7. 用户给出的「已出过的题目」绝对不要再出 —— 连换个说法、换个例子都不行,考点也要避开。",
+    );
+  }
 
   const user = [
     `目标岗位:${targetOf(data)}`,
     "",
     "候选人简历(JSON):",
     JSON.stringify(stripHeavyFields(data), null, 2),
-    "",
-    "请针对上面这份简历出 12 道面试题,严格按要求的分布输出。",
-  ].join("\n");
+  ];
 
-  return { system, user };
+  if (asked.length > 0) {
+    user.push(
+      "",
+      "已出过的题目(这份简历之前问过的,请务必避开,不要重复考):",
+      ...asked.map((q, i) => `${i + 1}. ${q}`),
+    );
+  }
+
+  user.push("", "请针对上面这份简历出 12 道面试题,严格按要求的分布输出。");
+
+  return { system: system.join("\n"), user: user.join("\n") };
 }
 
 /**
@@ -383,6 +410,9 @@ function errorText(e: unknown): string {
 /**
  * 出题(第一次模型调用)。
  *
+ * existingQuestions 是这份简历**已经出过的题干** —— 带上它,模型就会绕开,
+ * 这是生成前规避的第一道防线(也是主力防线)。
+ *
  * 什么时候走本地兜底:
  *   - 没配 MINIMAX_API_KEY —— 主路径
  *   - 模型调不通(网络/鉴权/超时)或输出根本不是 JSON —— 兜底并写明原因
@@ -391,9 +421,14 @@ function errorText(e: unknown): string {
  * 设计文档 §6.4 说这种情况任务失败(「模型没有生成出任何题目」),
  * 因为那说明提示词或模型出了问题,拿模板题糊弄过去只会把问题藏起来。
  */
-export async function generateQuestions(data: ResumeData): Promise<GenerateOutcome> {
+export async function generateQuestions(
+  data: ResumeData,
+  existingQuestions: readonly string[] = [],
+): Promise<GenerateOutcome> {
   const scan = scanResume(data);
-  const local = (): GeneratedQuestion[] => buildLocalQuestions(scan);
+  const asked = existingQuestions.map((q) => q.trim()).filter(Boolean);
+  // 兜底模板是固定的:靠关键词池转格避开已经出过的题
+  const local = (): GeneratedQuestion[] => buildLocalQuestions(scan, asked.length);
 
   if (!hasMiniMaxKey()) {
     return { questions: local(), engineNote: LOCAL_ENGINE_NOTE };
@@ -401,7 +436,7 @@ export async function generateQuestions(data: ResumeData): Promise<GenerateOutco
 
   let raw: string;
   try {
-    const { system, user } = buildQuestionPrompt(data);
+    const { system, user } = buildQuestionPrompt(data, asked);
     raw = await chat(system, user);
   } catch (e) {
     return {
