@@ -12,7 +12,7 @@ import { getSession } from "@/lib/session";
 import { listResumeSummaries } from "@/lib/resume-repo";
 import { SiteNav } from "@/components/site-nav/site-nav";
 import { QuestionBank } from "@/components/questions/question-bank";
-import styles from "./questions.module.css";
+import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic"; // 题库随时在变,别拿缓存
 
