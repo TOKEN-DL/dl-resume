@@ -28,6 +28,53 @@ export interface StageState {
   error?: string;
 }
 
+/**
+ * 判重命中的规则。
+ *
+ * 这里**不 import** dedupe.ts 里的 DedupRule —— types.ts 会被客户端组件 import,
+ * 而 dedupe.ts 顺着 fingerprint.ts 摸到 node:crypto,会把服务端依赖带进浏览器包。
+ * 两边的取值必须一致(R1 / R2 / R3),改一处记得改另一处。
+ */
+export type JobDedupRule = "R1" | "R2" | "R3";
+
+/** 单题判重的命中记录 —— 一道题跟题库里哪道重复 */
+export interface JobDedupeHit {
+  /** 在 job.questions 里的下标 */
+  index: number;
+  /** 命中的规则 */
+  rule: JobDedupRule;
+  /** 相似度:R1 恒为 1,R3 通常很低 */
+  similarity: number;
+  /** 与之重复的那道既有题的题干 */
+  matchedQuestion: string;
+  /** 与之重复的那道题属于哪一套 */
+  matchedSetId: string;
+  /** 那一套的来源简历标题 */
+  matchedSetTitle: string;
+}
+
+/**
+ * 跨套判重结果(#22)—— 存在任务里,前端拿它出提示条。
+ *
+ * 「整套不入库」的依据是 isDuplicate:本套与**任一**既有套的重复率 ≥ 55%。
+ */
+export interface JobDedupeResult {
+  /** 本套题总数 */
+  totalCount: number;
+  /** 与既有题重复的题数 */
+  duplicateCount: number;
+  /** 重复率 = 重复题数 / 本套题总数 */
+  ratio: number;
+  /** 触发门槛所需的重复题数 = ceil(总题数 × 55%) */
+  threshold: number;
+  /** 是否「整套高度重复」 */
+  isDuplicate: boolean;
+  /** 最像的那一套(重复最多的那一套) */
+  matchedSet: { id: string; title: string; createdAt: number } | null;
+  /** 逐题命中记录 */
+  hits: JobDedupeHit[];
+}
+
 /** 难度档 1-4 */
 export type QuestionDifficulty = 1 | 2 | 3 | 4;
 
@@ -88,6 +135,8 @@ export interface InterviewJob {
   resultInserted?: number;
   /** 上次入库因重复被跳过的题数(#21) */
   resultSkipped?: number;
+  /** 跨套判重结果(#22)—— 生成时算的,前端拿它出「整套高度重复」提示条 */
+  dedupe?: JobDedupeResult;
   /** 引擎说明(比如走了本地兜底) */
   engineNote?: string;
   error?: string;
@@ -112,6 +161,8 @@ export interface InterviewJobSummary {
   resultInserted?: number;
   /** 上次入库因重复被跳过的题数(#21) */
   resultSkipped?: number;
+  /** 跨套判重结果(#22) */
+  dedupe?: JobDedupeResult;
   engineNote?: string;
   error?: string;
   createdAt: number;
@@ -135,6 +186,7 @@ export function toInterviewJobSummary(job: InterviewJob): InterviewJobSummary {
     resultSetId: job.resultSetId,
     resultInserted: job.resultInserted,
     resultSkipped: job.resultSkipped,
+    dedupe: job.dedupe,
     engineNote: job.engineNote,
     error: job.error,
     createdAt: job.createdAt,
