@@ -14,9 +14,10 @@
  * 题目分布照设计文档 §5.2:4 档难度 × 3 题,基础/深挖各 6。
  * 写入走仓储层的 saveQuestionSet —— 撞 (userId, fingerprint) 唯一约束的题
  * **跳过而不是报错**,所以这个脚本可以反复跑。
+ * 指纹用判重引擎的归一化(shared fingerprint),跟应用侧同一套规则,不会跑偏。
  */
-import { createHash } from "node:crypto";
 import { prisma } from "../src/lib/prisma";
+import { fingerprint } from "../src/lib/interview/fingerprint";
 import { listQuestionItems, saveQuestionSet } from "../src/lib/interview/repo";
 
 /** 一道示例题 */
@@ -166,50 +167,6 @@ const SAMPLE_QUESTIONS: SeedQuestion[] = [
     difficulty: 4,
   },
 ];
-
-/**
- * 归一化题干(设计文档 §4.3)。
- *
- * 注意:这是脚本里的本地实现 —— 正式的判重引擎(#01)还没进主干,
- * 那边的 fingerprint.ts 落地后应当改成直接引用,别让两套归一化规则跑偏。
- */
-function normalize(text: string): string {
-  // 全角字符 → 半角
-  let s = text.replace(/[\uFF01-\uFF5E]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0xfee0),
-  );
-  s = s.replace(/\u3000/g, " ");
-  // 转小写
-  s = s.toLowerCase();
-  // 去掉所有空白与中英文标点(只留字母和数字)
-  s = s.replace(/[^\p{L}\p{N}]/gu, "");
-  // 剥开头的填充词,最多 2 轮
-  const fillers = [
-    "请介绍一下",
-    "介绍一下",
-    "请谈谈",
-    "谈谈",
-    "说说",
-    "请说说",
-    "简述",
-    "描述一下",
-    "请描述",
-    "说一下",
-    "聊聊",
-    "请聊一下",
-  ];
-  for (let i = 0; i < 2; i += 1) {
-    const hit = fillers.find((f) => s.startsWith(f));
-    if (!hit) break;
-    s = s.slice(hit.length);
-  }
-  return s;
-}
-
-/** 归一化指纹:sha1(normalize(text)).slice(0, 16) */
-function fingerprint(text: string): string {
-  return createHash("sha1").update(normalize(text), "utf8").digest("hex").slice(0, 16);
-}
 
 /** 命令行参数 */
 function parseArgs(argv: string[]): Record<string, string> {
