@@ -77,6 +77,9 @@ prototype/
 next-env.d.ts
 next-env.d.ts.bak
 
+# 并行开发用的 git worktree(每个 ticket 一个分支一个目录)
+.worktrees/
+
 # PDF 字体(运行时按需获取;CI/clone 时跑 npm run setup:fonts 重新下载)
 apps/web/public/fonts/*.otf
 apps/web/public/fonts/*.ttf
