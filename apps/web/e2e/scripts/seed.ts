@@ -7,21 +7,27 @@
  * 密码用 src/lib/auth 的 hashPassword 加密(Argon2id),跟登录接口
  * 校验的是同一套 —— 别自己造哈希。
  */
-import { E2E_EMAIL, E2E_PASSWORD, E2E_RESUME_TITLE, E2E_SKILLS } from "./env";
+import {
+  E2E_EMAIL,
+  E2E_PASSWORD,
+  E2E_RESUME_TITLE,
+  E2E_RESUME_TITLE_NARROW,
+  E2E_SKILLS,
+  E2E_SKILLS_NARROW,
+} from "./env";
 
 /**
  * 种子简历的正文 —— 结构照 src/lib/validation/resume.ts 的 ResumeDataSchema。
  *
  * 只有 basics + skills 是有意义的:
  *   - basics 必填字段填齐(name / label / email)
- *   - skills **恰好 6 条**(见 E2E_SKILLS 的注释:12 % 6 = 0 才能让第二轮
- *     押题出跟第一轮一模一样的 12 道题,跨套判重才真的触发)
+ *   - skills 的条数决定「关键词池」的长度,也就决定了本地兜底出题能出多少轮
  *   - projects **必须为空** —— 项目名也会进关键词池,多一个名字池长就变了
  *
  * data 字段存明文 JSON:简历正文的密文格式带 "v1.enc:" 前缀,
  * 解密时旧明文会自动识别并原样返回(见 crypto/resume-cipher.ts)。
  */
-function seedResumeData() {
+function seedResumeData(skills: readonly string[]) {
   return {
     basics: {
       name: "E2E 候选人",
@@ -37,7 +43,7 @@ function seedResumeData() {
     education: [],
     work: [],
     projects: [],
-    skills: E2E_SKILLS.map((name, i) => ({
+    skills: skills.map((name, i) => ({
       id: `s${i + 1}`,
       name,
       level: "advanced",
@@ -92,17 +98,29 @@ export async function seedE2E(): Promise<void> {
     },
   });
 
-  const resume = await prisma.resume.create({
+  // ── 两份简历,两个用途 ──
+  //   A(6 技能):组合空间 72 → 再押一次出的是**全新**的题(用例 7a)
+  //   B(1 技能):组合空间 12 → 第一轮就用光 → 再押一次必然整套重复(用例 7b)
+  const resumeA = await prisma.resume.create({
     data: {
       userId: user.id,
       title: E2E_RESUME_TITLE,
       template: "classic",
-      data: JSON.stringify(seedResumeData()),
+      data: JSON.stringify(seedResumeData(E2E_SKILLS)),
+    },
+  });
+  const resumeB = await prisma.resume.create({
+    data: {
+      userId: user.id,
+      title: E2E_RESUME_TITLE_NARROW,
+      template: "classic",
+      data: JSON.stringify(seedResumeData(E2E_SKILLS_NARROW)),
     },
   });
 
   console.log(
-    `[e2e] 种子就绪:用户 ${user.email} / 简历「${resume.title}」` +
-      `(${resume.id})/ 技能 ${E2E_SKILLS.length} 个`,
+    `[e2e] 种子就绪:用户 ${user.email}` +
+      ` / 简历「${resumeA.title}」(${resumeA.id},技能 ${E2E_SKILLS.length} 个)` +
+      ` / 简历「${resumeB.title}」(${resumeB.id},技能 ${E2E_SKILLS_NARROW.length} 个)`,
   );
 }
