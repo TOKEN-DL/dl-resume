@@ -1,0 +1,375 @@
+/**
+ * 「我的题库」组件样式 —— 筛选条 / 分组列表 / 空状态。
+ *
+ * 颜色一律走既有设计令牌,不引入新色相;字体只用 --font-display / --font-ui / --font-mono。
+ * 类名统一 qb 前缀(question bank),跟 interview 目录下的 qc(题卡)区分开。
+ */
+
+/* ─── 外壳 ────────────────────────────────────────────────────── */
+
+.bank {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ─── 头部 ────────────────────────────────────────────────────── */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headText {
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.title {
+  margin: 8px 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.sub {
+  margin: 8px 0 0;
+  max-width: 56ch;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+
+.again {
+  flex: none;
+  padding: 9px 18px;
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: background 160ms, border-color 160ms;
+}
+
+.again:hover {
+  background: var(--blue-deep);
+  border-color: var(--blue-deep);
+}
+
+/* ─── 筛选条 ──────────────────────────────────────────────────── */
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--pencil);
+}
+
+.select,
+.input {
+  min-width: 140px;
+  padding: 7px 10px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.select:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--blue-soft);
+  outline-offset: 1px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filterSubmit {
+  padding: 7px 16px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 8px;
+  background: var(--paper-deep);
+  color: var(--blue);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+
+.filterSubmit:hover {
+  background: var(--highlight);
+  border-color: var(--blue);
+}
+
+/* ─── 状态 ────────────────────────────────────────────────────── */
+
+.status {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--pencil);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--paper-edge);
+  border-left: 3px solid var(--blue-soft);
+  border-radius: 0 8px 8px 0;
+  background: var(--paper-deep);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+/* ─── 空状态 ──────────────────────────────────────────────────── */
+
+.empty {
+  padding: 44px 24px;
+  border: 1px dashed var(--paper-edge);
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.emptyText {
+  margin: 8px auto 0;
+  max-width: 46ch;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+
+.emptyCta {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 9px 18px;
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  background: var(--highlight);
+  color: var(--blue);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.emptyCta:hover {
+  background: var(--blue);
+  color: #fff;
+}
+
+/* ─── 分组 ────────────────────────────────────────────────────── */
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.group {
+  padding: 18px 20px 20px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 14px;
+  background: var(--paper-deep);
+}
+
+.groupHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--paper-edge);
+}
+
+.groupText {
+  min-width: 0;
+}
+
+.groupTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.groupMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--pencil);
+}
+
+.groupTime {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.groupSep {
+  color: var(--pencil-soft);
+}
+
+.groupCount {
+  color: var(--ink-soft);
+}
+
+.groupProvider {
+  color: var(--pencil);
+}
+
+.groupDelete {
+  flex: none;
+  padding: 5px 12px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms, color 160ms;
+}
+
+.groupDelete:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--highlight);
+}
+
+/* ─── 组里的题 ────────────────────────────────────────────────── */
+
+.groupItems {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.itemActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.itemDelete {
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: color 160ms, border-color 160ms, background 160ms;
+}
+
+.itemDelete:hover {
+  border-color: var(--paper-edge);
+  background: #fff;
+  color: var(--blue);
+}
+
+/* ─── 窄屏 ────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .again {
+    align-self: flex-start;
+  }
+
+  .group {
+    padding: 16px 14px;
+  }
+
+  .groupHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .groupDelete {
+    align-self: flex-start;
+  }
+
+  .select,
+  .input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .field {
+    width: 100%;
+  }
+}
