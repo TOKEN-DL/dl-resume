@@ -1,0 +1,224 @@
+/**
+ * 题卡样式 —— 「面试押题」页与「我的题库」页共用的展示单元。
+ *
+ * 类名统一 qc 前缀(question card):这个模块是 interview 目录下的公共样式表,
+ * 同一目录的其他组件(押题工作区、进度面板)也会往里加东西,前缀能避免撞车。
+ *
+ * 颜色一律走既有设计令牌,不引入新色相 —— 难度四档是「青 → 蓝 → 靛 → 深蓝」
+ * 的冷色阶(设计文档 §8.4),与 --blue 系同源,没有红黄绿那种「越难越红」的暖色。
+ */
+
+/* ─── 卡片 ────────────────────────────────────────────────────── */
+
+.qcCard {
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid var(--paper-edge);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.qcHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qcTags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ─── 标签 ────────────────────────────────────────────────────── */
+
+.qcTag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 9px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 999px;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.qcSep {
+  color: var(--pencil-soft);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* 难度四档:青 → 蓝 → 靛 → 深蓝 */
+.qcDiff1 {
+  --qc-diff: #0ea5e9;
+  --qc-diff-bg: #f0f9ff;
+  --qc-diff-edge: #bae6fd;
+}
+.qcDiff2 {
+  --qc-diff: #2563eb;
+  --qc-diff-bg: #eff6ff;
+  --qc-diff-edge: #bfdbfe;
+}
+.qcDiff3 {
+  --qc-diff: #4f46e5;
+  --qc-diff-bg: #eef2ff;
+  --qc-diff-edge: #c7d2fe;
+}
+.qcDiff4 {
+  --qc-diff: var(--blue-deep);
+  --qc-diff-bg: #e8edf9;
+  --qc-diff-edge: #c3cce8;
+}
+
+.qcDiff {
+  color: var(--qc-diff);
+  background: var(--qc-diff-bg);
+  border-color: var(--qc-diff-edge);
+  font-weight: 500;
+}
+
+.qcTopic {
+  max-width: 100%;
+}
+
+.qcTopicLabel {
+  color: var(--pencil);
+  font-size: 11px;
+}
+
+.qcTopicValue {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 考点词用「」包起来 —— 走伪元素,免得把引号塞进 DOM 文本里 */
+.qcTopicValue::before {
+  content: "「";
+  color: var(--pencil);
+}
+.qcTopicValue::after {
+  content: "」";
+  color: var(--pencil);
+}
+
+/* ─── 题干 ────────────────────────────────────────────────────── */
+
+.qcQuestion {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+/* ─── 折叠按钮 ────────────────────────────────────────────────── */
+
+.qcToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 8px;
+  background: var(--paper-deep);
+  color: var(--blue);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+
+.qcToggle:hover {
+  background: var(--highlight);
+  border-color: var(--blue);
+}
+
+.qcCaret {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.qcCaretOpen {
+  transform: rotate(90deg);
+}
+
+/* ─── 答案 ────────────────────────────────────────────────────── */
+
+.qcAnswer {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--blue-soft);
+  border-radius: 0 8px 8px 0;
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+/* ─── 星级 ────────────────────────────────────────────────────── */
+
+.qcStar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms, color 160ms;
+}
+
+.qcStar:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.qcStarOn {
+  border-color: var(--blue);
+  background: var(--highlight);
+  color: var(--blue);
+}
+
+.qcStarGlyph {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ─── 窄屏 ────────────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .qcCard {
+    padding: 14px;
+  }
+  .qcHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .qcStar {
+    align-self: flex-start;
+  }
+}
