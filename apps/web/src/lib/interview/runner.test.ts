@@ -170,7 +170,7 @@ describe("runJob", () => {
  * 跨套判重在任务里的落点(#22)。
  *
  * 盯三件事:
- *   1. 出题前先查这份简历已经出过的题干(最多 60 条)—— 生成前规避的第一道防线
+ *   1. 出题前先查这个用户已经出过的题干(整个题库,最多 60 条)—— 生成前规避的第一道防线
  *   2. 查重节点跟题库里已有的题比一遍,重复的题记进任务
  *   3. 整套高度重复时任务里带着这个结论,前端据此出提示条
  */
@@ -205,19 +205,20 @@ describe("runJob · 跨套判重", () => {
     updatedAt: new Date(1_700_000_000_000),
   };
 
-  it("出题前先查这份简历已经出过的题干,最多 60 条", async () => {
+  it("出题前先查这个用户已经出过的题干,最多 60 条", async () => {
     makeJob("j_asked");
     await runJob("j_asked");
 
-    expect(listQuestionItems).toHaveBeenCalledWith("u1", { resumeId: "r1", limit: 60 });
+    // 取的是**整个题库**的,不只这份简历的 —— 跨简历撞题也要提前避开
+    expect(listQuestionItems).toHaveBeenCalledWith("u1", { limit: 60 });
   }, 20000);
 
   it("跟题库里已有的题比一遍:重复的题记进任务,整套判为高度重复", async () => {
     // 题库里放的正是这次要出的那 12 道题 → 12 道全重复
     const produced = buildLocalQuestions(scanResume(RESUME));
     vi.mocked(listQuestionItems).mockImplementation(async (_userId, filter) =>
-      // 带 resumeId 的那次是「这份简历已出过的题干」,不带的是整个题库
-      filter?.resumeId ? [] : produced.map((q, i) => itemRowOf(q, "qs_old", i)),
+      // 带 limit 的那次是「已经出过的题干」,不带的是整个题库
+      filter?.limit ? [] : produced.map((q, i) => itemRowOf(q, "qs_old", i)),
     );
     vi.mocked(listQuestionSetsByUser).mockResolvedValue([setRow]);
 

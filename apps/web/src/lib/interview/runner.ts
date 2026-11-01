@@ -90,13 +90,17 @@ function failStage(job: InterviewJob, key: InterviewStageKey, error: string): vo
 const ASKED_LIMIT = 60;
 
 /**
- * 这份简历已经出过的题干(最近 60 条,按创建时间倒序)。
+ * 这个用户已经出过的题干(最近 60 条,按创建时间倒序)。
  *
  * 生成前规避的第一道防线:把清单喂给模型,让它绕开这些题。
- * 只取这份简历的 —— 别的简历出的题不算「这份简历问过的」。
+ *
+ * 取**整个题库**的,不只这份简历的 —— 题库是按用户隔离的整体,
+ * 跨套判重(§4.2)本来也是跟整个题库比。只避让「这份简历问过的」会漏:
+ * 两份技能池一样的简历会互相撞出**一模一样的 12 道题**,第二份被判整套重复,
+ * 用户从此对那份简历再也押不出新题。
  */
-async function listAskedQuestions(userId: string, resumeId: string): Promise<string[]> {
-  const rows = await listQuestionItems(userId, { resumeId, limit: ASKED_LIMIT });
+async function listAskedQuestions(userId: string): Promise<string[]> {
+  const rows = await listQuestionItems(userId, { limit: ASKED_LIMIT });
   return rows.map((r) => r.question).filter((q) => typeof q === "string" && q.trim());
 }
 
@@ -130,8 +134,8 @@ export async function runJob(jobId: string): Promise<void> {
 
     /* ── 2. 出题 ─────────────────────────────────────────────── */
     await beginStage(job, "generate");
-    // 第一道防线(生成前规避):把这份简历已经出过的题干喂给模型,让它绕开
-    const alreadyAsked = await listAskedQuestions(job.userId, job.source.resumeId);
+    // 第一道防线(生成前规避):把这个用户已经出过的题干喂给模型,让它绕开
+    const alreadyAsked = await listAskedQuestions(job.userId);
     const generated = await generateQuestions(source, alreadyAsked);
     if (generated.engineNote) notes.push(generated.engineNote);
     // 谁出的题 —— 入库时原样写进题库的 provider 字段

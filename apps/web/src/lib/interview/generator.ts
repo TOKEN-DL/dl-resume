@@ -216,8 +216,11 @@ function targetOf(data: ResumeData): string {
  *   - **绝不编造简历里没有的经历、公司、数字** —— 押题题库会被反复翻,
  *     编出来的题比没有题更糟
  *
- * existingQuestions 是这份简历**已经出过的题干**(生成前规避的第一道防线):
+ * existingQuestions 是这个用户**已经出过的题干**(生成前规避的第一道防线):
  * 带上它,模型就会绕开这些题 —— 换一种问法、换一个考点都不行。
+ *
+ * 取的是**整个题库**的,不只当前这份简历的 —— 题库是按用户隔离的整体,
+ * 跨套判重也是跟整个题库比。跨简历的题重复了,用户看到的是同一道题换了个名字。
  */
 export function buildQuestionPrompt(
   data: ResumeData,
@@ -254,7 +257,7 @@ export function buildQuestionPrompt(
   if (asked.length > 0) {
     user.push(
       "",
-      "已出过的题目(这份简历之前问过的,请务必避开,不要重复考):",
+      "已出过的题目(这个用户之前问过的,请务必避开,不要重复考):",
       ...asked.map((q, i) => `${i + 1}. ${q}`),
     );
   }
