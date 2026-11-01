@@ -9,10 +9,11 @@
  * GET /api/interview/[id]。用户切到别的页面、刷新、甚至关掉标签页,
  * 任务都在服务端继续跑;回来时 GET /api/interview 能找到那个任务并接管。
  *
- * 这一版**不入库** —— 题库入库是 #21 的活。所以跑完之后停在
- * 「待确认入库」这个节点,题卡先给用户看,勾的「重点关注」先记在本地 state 里。
+ * 跑完之后停在「待确认入库」这个节点:题卡先给用户看,勾的「重点关注」
+ * 先记在本地 state 里;确认入库时把这些序号一起递给后端,入库后直接落成收藏。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { QuestionCard } from "./question-card";
 import { SourcePicker, type InterviewResumeItem, type InterviewStartPayload } from "./source-picker";
 import { ProgressPanel } from "./progress-panel";
@@ -33,10 +34,20 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
   const [phase, setPhase] = useState<Phase>("source");
   const [job, setJob] = useState<InterviewJobSummary | null>(null);
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
-  /** 「重点关注」按题目序号记 —— 这一版还没入库,先记在本地 */
+  /** 「重点关注」按题目在 job.questions 里的下标记 —— 入库时要按这个下标落到对应的题上 */
   const [starred, setStarred] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  /** 二次确认层是否打开 */
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  /** 正在写入题库 */
+  const [confirming, setConfirming] = useState(false);
+  /** 预览出来的「会入库几题 / 会跳过几题」—— null 表示还在算 */
+  const [plan, setPlan] = useState<{ inserted: number; skipped: number } | null>(null);
+  /** 预览没算出来 —— 不挡确认,只是这一层报不出准确的重复题数 */
+  const [planFailed, setPlanFailed] = useState(false);
+  /** 入库回执 —— 用来显示「已入库 N 题 → 去题库」 */
+  const [saved, setSaved] = useState<{ inserted: number; skipped: number } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -130,6 +141,7 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
       setJob(body.job);
       setQuestions([]);
       setStarred({});
+      setSaved(null);
       setPhase("running");
       startPolling(body.job.id);
     } catch {
@@ -148,6 +160,7 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
     setJob(null);
     setQuestions([]);
     setStarred({});
+    setSaved(null);
     setError(null);
     setPhase("source");
   }
@@ -155,15 +168,104 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
   /**
    * 再押一套:回到来源选择,但**不删掉上一套**。
    *
-   * 这一版还没入库,题目只活在内存里 —— 删了就再也看不回来了。
-   * 留着它,用户离开再回来时 GET /api/interview 还能把上一套接上。
+   * 入库过的题目已经在题库里了(去题库页能看见),这里只是回到来源选择,
+   * 好开下一套。
    */
   function again() {
+    setSaved(null);
     setPhase("source");
   }
 
-  /** 题卡按难度升序 —— 前面偏基础,后面偏深挖 */
-  const sorted = [...questions].sort((a, b) => a.difficulty - b.difficulty);
+  /** 勾了「重点关注」的题目序号 —— 对应 job.questions 里的下标 */
+  const starredIndexes = useMemo(
+    () =>
+      Object.entries(starred)
+        .filter(([, on]) => on)
+        .map(([k]) => Number(k))
+        .filter((n) => Number.isInteger(n) && n >= 0),
+    [starred],
+  );
+
+  /**
+   * 打开二次确认层。
+   *
+   * 先向服务端要一次「预览」—— 有几题会入库、有几题是库里已有的重复题。
+   * 重复题数只有服务端算得准(指纹归一化在服务端那侧),前端不许瞎编一个数。
+   */
+  async function openConfirm() {
+    if (!job) return;
+    setConfirmOpen(true);
+    setPlan(null);
+    setPlanFailed(false);
+    try {
+      const r = await fetch(`/api/interview/${job.id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preview: true }),
+      });
+      if (!r.ok) {
+        setPlanFailed(true);
+        return;
+      }
+      const body = await r.json();
+      setPlan({ inserted: body.inserted ?? 0, skipped: body.skipped ?? 0 });
+    } catch {
+      setPlanFailed(true);
+    }
+  }
+
+  /** 关掉二次确认层 —— 不写库,任务还能再确认 */
+  function cancelConfirm() {
+    setConfirmOpen(false);
+    setPlan(null);
+    setPlanFailed(false);
+  }
+
+  /**
+   * 确认入库。
+   *
+   * 把「重点关注」的题目序号一起递上去 —— 入库时这些题直接落成收藏。
+   * 重复点确认不会写第二份:服务端认得这个任务已经入过库,直接把上次的
+   * 结果原样返回。
+   */
+  async function doConfirm() {
+    if (!job) return;
+    setConfirming(true);
+    try {
+      const r = await fetch(`/api/interview/${job.id}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ starredIndexes }),
+      });
+      const body = await r.json();
+      if (!r.ok) {
+        setError(body?.error ?? "入库失败,请重试");
+        return;
+      }
+      setConfirmOpen(false);
+      setPlan(null);
+      setPlanFailed(false);
+      setSaved({ inserted: body.inserted ?? 0, skipped: body.skipped ?? 0 });
+    } catch {
+      setError("网络错误,入库没有完成,请重试");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  /**
+   * 题卡按难度升序 —— 前面偏基础,后面偏深挖。
+   *
+   * 连着原始下标一起排:「重点关注」记的是 job.questions 里的下标,
+   * 入库时要按这个下标落到对应的题上,不能拿排序后的位置去对。
+   */
+  const sorted = useMemo(
+    () =>
+      questions
+        .map((q, index) => ({ q, index }))
+        .sort((a, b) => a.q.difficulty - b.q.difficulty),
+    [questions],
+  );
 
   return (
     <div className={styles.iwWorkspace}>
@@ -212,19 +314,84 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
           </div>
 
           <div className={styles.iwCardList}>
-            {sorted.map((q, i) => (
+            {sorted.map(({ q, index }) => (
               <QuestionCard
-                key={`${job.id}-${i}`}
+                key={`${job.id}-${index}`}
                 question={q.question}
                 answer={q.answer}
                 difficulty={q.difficulty}
                 category={q.category}
                 topic={q.topic}
-                starred={Boolean(starred[i])}
+                starred={Boolean(starred[index])}
                 starMode="focus"
-                onStarChange={(next) => setStarred((s) => ({ ...s, [i]: next }))}
+                onStarChange={(next) => setStarred((s) => ({ ...s, [index]: next }))}
               />
             ))}
+          </div>
+
+          {!saved ? (
+            <div className={styles.cfBar}>
+              <p className={styles.cfHint}>
+                入库后这 {sorted.length} 道题就进题库了;勾了「重点关注」的会直接落成收藏。
+              </p>
+              <button type="button" className={styles.cfPrimaryBtn} onClick={openConfirm}>
+                确认入库题库
+              </button>
+            </div>
+          ) : (
+            <div className={styles.cfDone} role="status">
+              <span>
+                已入库 {saved.inserted} 题
+                {saved.skipped > 0 ? ` / 跳过 ${saved.skipped} 道重复题` : ""} →
+              </span>
+              <Link href="/questions" className={styles.cfDoneLink}>
+                去题库
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {confirmOpen && (
+        <div
+          className={styles.cfOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="确认入库题库"
+        >
+          <div className={styles.cfDialog}>
+            <h3 className={styles.cfDialogTitle}>确认入库题库</h3>
+
+            {plan ? (
+              <p className={styles.cfCounts}>
+                {plan.inserted} 题入库 / 跳过 {plan.skipped} 题重复
+              </p>
+            ) : planFailed ? (
+              <p className={styles.cfCounts}>
+                本次共 {sorted.length} 道题待入库(重复题数没核对上,写完按实际结果算)。
+              </p>
+            ) : (
+              <p className={styles.cfCounts}>正在核对重复题…</p>
+            )}
+
+            <div className={styles.cfActions}>
+              <button
+                type="button"
+                className={styles.cfGhostBtn}
+                onClick={cancelConfirm}
+                disabled={confirming}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className={styles.cfPrimaryBtn}
+                onClick={doConfirm}
+                disabled={confirming}
+              >
+                {confirming ? "入库中…" : "确认入库"}
+              </button>
+            </div>
           </div>
         </div>
       )}

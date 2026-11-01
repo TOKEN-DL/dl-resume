@@ -682,3 +682,164 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   以下是「押题确认入库」的样式(#21)。
+   前缀约定:
+     cf = confirm flow(底部操作条 + 二次确认层 + 入库成功提示)
+   颜色一律走既有设计令牌,不引入新色相;字体只用 --font-display /
+   --font-ui / --font-mono 三支,不新增字体。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── 底部操作条 ──────────────────────────────────────────────── */
+
+.cfBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.cfHint {
+  margin: 0;
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* ─── 按钮 ────────────────────────────────────────────────────── */
+
+.cfPrimaryBtn {
+  padding: 10px 20px;
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 160ms;
+}
+
+.cfPrimaryBtn:hover:not(:disabled) {
+  background: var(--blue-deep);
+}
+
+.cfPrimaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cfGhostBtn {
+  padding: 9px 16px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 160ms, color 160ms;
+}
+
+.cfGhostBtn:hover:not(:disabled) {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.cfGhostBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ─── 二次确认层 ──────────────────────────────────────────────── */
+
+.cfOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.cfDialog {
+  width: 100%;
+  max-width: 420px;
+  padding: 22px 24px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.16);
+}
+
+.cfDialogTitle {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cfCounts {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.cfActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ─── 入库成功提示 ────────────────────────────────────────────── */
+
+.cfDone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--blue-soft);
+  border-left: 3px solid var(--blue);
+  border-radius: 10px;
+  background: var(--highlight);
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.cfDoneLink {
+  color: var(--blue);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.cfDoneLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+  .cfBar {
+    padding: 14px;
+  }
+  .cfDialog {
+    padding: 18px;
+  }
+}
+
