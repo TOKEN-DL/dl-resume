@@ -14,6 +14,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const getSessionMock = vi.fn();
 const saveQuestionSetMock = vi.fn();
 const findManyMock = vi.fn();
+const listQuestionItemsMock = vi.fn();
+const listQuestionSetsByUserMock = vi.fn();
 
 vi.mock("@/lib/session", () => ({
   getSession: () => getSessionMock(),
@@ -21,6 +23,8 @@ vi.mock("@/lib/session", () => ({
 
 vi.mock("@/lib/interview/repo", () => ({
   saveQuestionSet: (...args: unknown[]) => saveQuestionSetMock(...args),
+  listQuestionItems: (...args: unknown[]) => listQuestionItemsMock(...args),
+  listQuestionSetsByUser: (...args: unknown[]) => listQuestionSetsByUserMock(...args),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -126,6 +130,12 @@ beforeEach(() => {
 
   findManyMock.mockReset();
   findManyMock.mockResolvedValue([]);
+
+  listQuestionItemsMock.mockReset();
+  listQuestionItemsMock.mockResolvedValue([]);
+
+  listQuestionSetsByUserMock.mockReset();
+  listQuestionSetsByUserMock.mockResolvedValue([]);
 });
 
 describe("POST /api/interview/[jobId]/confirm", () => {
@@ -302,5 +312,173 @@ describe("POST /api/interview/[jobId]/confirm", () => {
       fingerprint("什么是 RAG？"),
       fingerprint("讲讲向量检索的召回策略"),
     ]);
+  });
+});
+
+/**
+ * 跨套判重接入(#22)—— 入库这一段。
+ *
+ * 盯四件事:
+ *   1. 题库里已有的题**不写入**(跨套判重,不只是唯一约束能挡的那种)
+ *   2. 整套重复率超阈值 → 整套不入库,报 409
+ *   3. 用户拍板(force)→ 只写入不重复的题,重复的题跳过
+ *   4. 二次确认层报的数字里,跨套跳过的题也要算进去
+ */
+describe("POST /api/interview/[jobId]/confirm · 跨套判重", () => {
+  /** 题库里的一道题 */
+  function libItem(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "qi_old",
+      userId: "u1",
+      setId: "qs_old",
+      resumeId: "res_1",
+      resumeTitle: "后端工程师简历",
+      question: "什么是 RAG？",
+      answer: "检索增强生成。",
+      topic: "RAG",
+      category: "basic",
+      difficulty: 1,
+      fingerprint: "fp_old",
+      starred: false,
+      createdAt: new Date("2026-10-28T00:00:00.000Z"),
+      updatedAt: new Date("2026-10-28T00:00:00.000Z"),
+      ...overrides,
+    };
+  }
+
+  /** 题库里那一套 */
+  const oldSet = {
+    id: "qs_old",
+    userId: "u1",
+    resumeId: "res_1",
+    resumeTitle: "后端工程师简历",
+    provider: "minimax",
+    createdAt: new Date("2026-10-28T00:00:00.000Z"),
+    updatedAt: new Date("2026-10-28T00:00:00.000Z"),
+  };
+
+  /** 写库时按传入的题目如实回 —— 免得测出来的是 mock 的固定值 */
+  function echoSavedItems() {
+    saveQuestionSetMock.mockImplementation(async (arg: { items: { question: string }[] }) => ({
+      set: setRow(),
+      inserted: arg.items.map((it, i) => itemRow({ id: `qi_new_${i}`, question: it.question })),
+      skipped: 0,
+    }));
+  }
+
+  /** 三道题的任务:前两道在题库里已经有了 */
+  function jobWithThree() {
+    return makeJob({
+      questions: [
+        { question: "什么是 RAG？", answer: "a", topic: "RAG", category: "basic", difficulty: 1 },
+        { question: "讲讲向量检索的召回策略", answer: "b", topic: "召回策略", category: "deep", difficulty: 3 },
+        { question: "PostgreSQL 的索引怎么选", answer: "c", topic: "索引选型", category: "basic", difficulty: 2 },
+      ],
+    });
+  }
+
+  beforeEach(() => {
+    echoSavedItems();
+    listQuestionItemsMock.mockResolvedValue([
+      libItem(),
+      libItem({
+        id: "qi_old_2",
+        question: "讲讲向量检索的召回策略",
+        topic: "召回策略",
+        category: "deep",
+        difficulty: 3,
+      }),
+    ]);
+    listQuestionSetsByUserMock.mockResolvedValue([oldSet]);
+  });
+
+  it("题库里已有的题不写入:只写不重复的那几道", async () => {
+    // 只有一道撞上(1/3 < 55%)→ 整套照常入库,但那道重复题不写
+    listQuestionItemsMock.mockResolvedValue([libItem()]);
+    createJob(jobWithThree(), { data: {} });
+
+    const res = await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
+    const body = await res.json();
+
+    const items = saveQuestionSetMock.mock.calls[0][0].items;
+    expect(items).toHaveLength(2);
+    expect(items.map((i: { question: string }) => i.question)).toEqual([
+      "讲讲向量检索的召回策略",
+      "PostgreSQL 的索引怎么选",
+    ]);
+    expect(body.inserted).toBe(2);
+    expect(body.skipped).toBe(1);
+  });
+
+  it("整套重复率超阈值:整套不入库,报 409", async () => {
+    createJob(jobWithThree(), { data: {} });
+
+    const res = await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.error).toBe("set_duplicate");
+    expect(body.duplicateCount).toBe(2);
+    expect(body.totalCount).toBe(3);
+    expect(body.matchedSet.id).toBe("qs_old");
+    expect(saveQuestionSetMock).not.toHaveBeenCalled();
+  });
+
+  it("用户拍板(force):只写入不重复的题,重复的题跳过", async () => {
+    createJob(jobWithThree(), { data: {} });
+
+    const res = await POST(post({ force: true }), {
+      params: Promise.resolve({ jobId: "iv_test" }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    const items = saveQuestionSetMock.mock.calls[0][0].items;
+    expect(items).toHaveLength(1);
+    expect(items[0].question).toBe("PostgreSQL 的索引怎么选");
+    expect(body.inserted).toBe(1);
+    expect(body.skipped).toBe(2);
+  });
+
+  it("全部都是重复题时:没有可入库的题,不建空套", async () => {
+    createJob(
+      makeJob({
+        questions: [
+          { question: "什么是 RAG？", answer: "a", topic: "RAG", category: "basic", difficulty: 1 },
+        ],
+      }),
+      { data: {} },
+    );
+
+    const res = await POST(post({ force: true }), {
+      params: Promise.resolve({ jobId: "iv_test" }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.error).toBe("all_duplicate");
+    expect(saveQuestionSetMock).not.toHaveBeenCalled();
+  });
+
+  it("预览报的数字里,跨套判重跳过的题也算进去", async () => {
+    createJob(jobWithThree(), { data: {} });
+
+    const res = await POST(post({ preview: true }), {
+      params: Promise.resolve({ jobId: "iv_test" }),
+    });
+    const body = await res.json();
+
+    expect(body.inserted).toBe(1);
+    expect(body.skipped).toBe(2);
+    expect(saveQuestionSetMock).not.toHaveBeenCalled();
+  });
+
+  it("题库读的是本人的题库,按 userId 隔离", async () => {
+    createJob(jobWithThree(), { data: {} });
+
+    await POST(post({ force: true }), { params: Promise.resolve({ jobId: "iv_test" }) });
+
+    expect(listQuestionItemsMock).toHaveBeenCalledWith("u1");
+    expect(listQuestionSetsByUserMock).toHaveBeenCalledWith("u1");
   });
 });

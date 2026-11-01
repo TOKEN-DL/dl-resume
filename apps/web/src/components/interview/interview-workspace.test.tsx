@@ -22,7 +22,7 @@ const QUESTIONS = [
 ];
 
 /** 一个跑完、等着确认的任务 */
-function job() {
+function job(overrides: Record<string, unknown> = {}) {
   return {
     id: "iv_1",
     userId: "u1",
@@ -34,7 +34,23 @@ function job() {
     questions: QUESTIONS,
     createdAt: 1,
     updatedAt: 1,
+    ...overrides,
   };
+}
+
+/** 一个被判「整套高度重复」的任务 */
+function duplicateJob() {
+  return job({
+    dedupe: {
+      totalCount: 12,
+      duplicateCount: 8,
+      ratio: 8 / 12,
+      threshold: 7,
+      isDuplicate: true,
+      matchedSet: { id: "qs_old", title: "后端工程师简历", createdAt: 1 },
+      hits: [],
+    },
+  });
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -50,10 +66,10 @@ function jsonResponse(body: unknown, status = 200) {
  * GET /api/interview 回一个「等确认」的任务(进页面就接上);
  * POST …/confirm 分两种:preview 只报数,真确认才回套 id。
  */
-function installFetch() {
+function installFetch(jobSummary: Record<string, unknown> = job()) {
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     const u = String(url);
-    if (u === "/api/interview") return jsonResponse({ jobs: [job()] });
+    if (u === "/api/interview") return jsonResponse({ jobs: [jobSummary] });
     if (u.includes("/confirm")) {
       const body = JSON.parse(String(init?.body ?? "{}")) as { preview?: boolean };
       if (body.preview) {
@@ -161,5 +177,92 @@ describe("押题页确认入库", () => {
     expect(link.getAttribute("href")).toBe("/questions");
     // 入库后按钮收起来,不能再点出第二份
     expect(screen.queryByRole("button", { name: "确认入库题库" })).toBeNull();
+  });
+});
+
+/**
+ * 跨套判重的拦截(#22)—— 整套高度重复时的提示条与逃生口。
+ *
+ * 盯三件事:
+ *   1. 出现提示条,说清跟哪套重复、重复了几题
+ *   2. 出现「仍要入库（只保留不重复的 N 题）」按钮
+ *   3. 点它 → 带上 force 去写库(只写不重复的题)
+ */
+describe("押题页 · 整套高度重复", () => {
+  beforeEach(() => {
+    installFetch(duplicateJob());
+  });
+
+  it("出提示条,说清跟哪一套重复、重复了几题", async () => {
+    render(<InterviewWorkspace resumes={[]} />);
+    await waitForResult();
+
+    expect(screen.getByText("这套与题库里已有的题高度重复")).toBeTruthy();
+    expect(screen.getByText(/8 \/ 12 题/)).toBeTruthy();
+    expect(screen.getByText(/后端工程师简历/)).toBeTruthy();
+  });
+
+  it("有「仍要入库（只保留不重复的 N 题）」按钮", async () => {
+    render(<InterviewWorkspace resumes={[]} />);
+    await waitForResult();
+
+    expect(
+      screen.getByRole("button", { name: "仍要入库（只保留不重复的 4 题）" }),
+    ).toBeTruthy();
+  });
+
+  it("点「仍要入库」带上 force 去写库", async () => {
+    render(<InterviewWorkspace resumes={[]} />);
+    await waitForResult();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "仍要入库（只保留不重复的 4 题）" }),
+    );
+
+    await waitFor(() => expect(confirmCalls()).toHaveLength(1));
+    const body = JSON.parse(String(confirmCalls()[0][1].body));
+    expect(body.force).toBe(true);
+  });
+
+  it("整套被拦时,普通「确认入库题库」按钮不出现", async () => {
+    render(<InterviewWorkspace resumes={[]} />);
+    await waitForResult();
+
+    expect(screen.queryByRole("button", { name: "确认入库题库" })).toBeNull();
+  });
+
+  it("入库时服务端才判定整套重复:关掉确认层,提示条接管", async () => {
+    // 预览说没问题,真确认的时候服务端说整套重复
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u === "/api/interview") return jsonResponse({ jobs: [job()] });
+      if (u.includes("/confirm")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { preview?: boolean };
+        if (body.preview) return jsonResponse({ inserted: 2, skipped: 0, setId: null });
+        return jsonResponse(
+          {
+            error: "set_duplicate",
+            duplicateCount: 2,
+            totalCount: 2,
+            matchedSet: { id: "qs_old", title: "旧简历", createdAt: 1 },
+          },
+          409,
+        );
+      }
+      return jsonResponse({ error: "unsupported" }, 400);
+    });
+
+    render(<InterviewWorkspace resumes={[]} />);
+    await waitForResult();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认入库题库" }));
+    await waitFor(() => expect(screen.getByText("2 题入库 / 跳过 0 题重复")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "确认入库" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /仍要入库/ })).toBeTruthy(),
+    );
+    // 确认层关掉,提示条露出来
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
