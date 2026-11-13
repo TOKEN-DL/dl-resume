@@ -205,6 +205,7 @@ describe("runJob · 跨套判重", () => {
   const setRow = {
     id: "qs_old",
     userId: "u1",
+    collectionId: "qc_1",
     resumeId: "r1",
     resumeTitle: "后端工程师简历",
     provider: "minimax",

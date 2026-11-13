@@ -16,6 +16,8 @@ import { prisma } from "../prisma";
 export type QuestionSetRow = {
   id: string;
   userId: string;
+  /** 所属题库(用户自建的分组) */
+  collectionId: string;
   /** 来源简历。存字符串不建外键:简历被删了题还在 */
   resumeId: string | null;
   resumeTitle: string;
@@ -67,6 +69,8 @@ export interface CreateQuestionItemInput {
 /** 写入一整套 */
 export interface SaveQuestionSetInput {
   userId: string;
+  /** 所属题库(用户自建的分组)。必填 —— 套总有归属,不许悬空。 */
+  collectionId: string;
   resumeId?: string | null;
   resumeTitle: string;
   /** 生成引擎:deepseek / minimax / local */
@@ -153,6 +157,7 @@ export async function saveQuestionSet(
   const set = await prisma.questionSet.create({
     data: {
       userId: input.userId,
+      collectionId: input.collectionId,
       resumeId: input.resumeId ?? null,
       resumeTitle: input.resumeTitle,
       provider: input.provider,
@@ -197,6 +202,37 @@ export async function listQuestionSetsByUser(userId: string): Promise<QuestionSe
     where: { userId },
     orderBy: { createdAt: "desc" },
   });
+}
+
+/** 套行 + 这一套里一共几道题 */
+export type QuestionSetWithCountRow = QuestionSetRow & { itemCount: number };
+
+/**
+ * 列出该用户的全套,连着每一套的题数一起取回来。
+ *
+ * 题库块头要显示「N 套 · M 题」—— 题数得从套这一层统计,而不是从题目列表
+ * 那一层:题目列表是筛过的,块头显示的是这个库里到底有多少。
+ * 一次查询把 count 带回来,比先取套再逐套 count 省事。
+ */
+export async function listQuestionSetsByUserWithCounts(
+  userId: string,
+): Promise<QuestionSetWithCountRow[]> {
+  const rows = await prisma.questionSet.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    include: { _count: { select: { items: true } } },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    collectionId: row.collectionId,
+    resumeId: row.resumeId,
+    resumeTitle: row.resumeTitle,
+    provider: row.provider,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    itemCount: row._count.items,
+  }));
 }
 
 /** 按条件列出题目(按用户隔离,创建时间倒序) */

@@ -19,6 +19,7 @@
 import { prisma } from "../src/lib/prisma";
 import { fingerprint } from "../src/lib/interview/fingerprint";
 import { listQuestionItems, saveQuestionSet } from "../src/lib/interview/repo";
+import { resolveTargetCollection } from "../src/lib/interview/collections-repo";
 
 /** 一道示例题 */
 interface SeedQuestion {
@@ -247,8 +248,11 @@ async function main() {
   }
 
   // ── 写入 ──────────────────────────────────────────────────
+  // 落到该用户的题库里:有题库就用最近更新的那个,一个都没有就建「默认题库」
+  const collection = await resolveTargetCollection(user.id);
   const result = await saveQuestionSet({
     userId: user.id,
+    collectionId: collection.id,
     resumeId,
     resumeTitle,
     provider: args.provider || "local",

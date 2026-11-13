@@ -9,6 +9,7 @@ import type { Prisma } from "@prisma/client";
 interface QuestionSetRow {
   id: string;
   userId: string;
+  collectionId: string;
   resumeId: string | null;
   resumeTitle: string;
   provider: string;
@@ -102,6 +103,7 @@ vi.mock("../prisma", () => ({
       create: vi.fn(async (args: Prisma.QuestionSetCreateArgs) => {
         const d = args.data as {
           userId: string;
+          collectionId: string;
           resumeId?: string | null;
           resumeTitle: string;
           provider: string;
@@ -109,6 +111,7 @@ vi.mock("../prisma", () => ({
         const row: QuestionSetRow = {
           id: newId("qs"),
           userId: d.userId,
+          collectionId: d.collectionId,
           resumeId: d.resumeId ?? null,
           resumeTitle: d.resumeTitle,
           provider: d.provider,
@@ -259,6 +262,7 @@ const draft = (overrides: Partial<QuestionItemDraft> = {}): QuestionItemDraft =>
 const setDraft = (
   overrides: {
     userId?: string;
+    collectionId?: string;
     resumeId?: string | null;
     resumeTitle?: string;
     provider?: string;
@@ -266,6 +270,7 @@ const setDraft = (
   } = {},
 ) => ({
   userId: "u1",
+  collectionId: "col_1",
   resumeId: "res_1",
   resumeTitle: "后端简历",
   provider: "minimax",
@@ -291,6 +296,14 @@ describe("saveQuestionSet", () => {
     // 题目都挂在这一套下
     expect(res.inserted.every((i) => i.setId === res.set.id)).toBe(true);
     expect(res.inserted.every((i) => i.userId === "u1")).toBe(true);
+  });
+
+  it("写入整套时带上题库归属:套落在用户选的那个题库里", async () => {
+    const res = await saveQuestionSet({
+      ...setDraft({ collectionId: "col_字节" }),
+      items: [draft({ fingerprint: "fp_x" })],
+    });
+    expect(res.set.collectionId).toBe("col_字节");
   });
 
   it("同一套里 fingerprint 相同的题:后者被跳过并计入重复数,不抛错", async () => {
