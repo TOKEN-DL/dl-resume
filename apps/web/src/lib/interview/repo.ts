@@ -19,7 +19,7 @@ export type QuestionSetRow = {
   /** 来源简历。存字符串不建外键:简历被删了题还在 */
   resumeId: string | null;
   resumeTitle: string;
-  /** 生成引擎:minimax / local */
+  /** 生成引擎:deepseek / minimax / local */
   provider: string;
   createdAt: Date;
   updatedAt: Date;
@@ -69,7 +69,7 @@ export interface SaveQuestionSetInput {
   userId: string;
   resumeId?: string | null;
   resumeTitle: string;
-  /** 生成引擎:minimax / local */
+  /** 生成引擎:deepseek / minimax / local */
   provider: string;
   items: CreateQuestionItemInput[];
 }

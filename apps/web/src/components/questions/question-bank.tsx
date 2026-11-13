@@ -78,6 +78,7 @@ const VALID_DIFFICULTIES = ["1", "2", "3", "4"];
 
 /** 生成引擎的中文说法 */
 function providerLabel(provider: string): string {
+  if (provider === "deepseek") return "DeepSeek";
   if (provider === "minimax") return "MiniMax";
   if (provider === "local") return "本地兜底";
   return provider;

@@ -68,7 +68,7 @@ model QuestionSet {
   /// 来源简历。存字符串不建外键:简历被删了题还在(题是用户资产,不该跟着简历消失)
   resumeId    String?
   resumeTitle String
-  /// 生成引擎:minimax / local
+  /// 生成引擎:deepseek / minimax / local
   provider    String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

@@ -86,6 +86,9 @@ function makeJob(overrides: Partial<InterviewJob> = {}): InterviewJob {
     source: { kind: "resume", resumeId: "res_1" },
     stages: [],
     progress: 1,
+    // 跑完的任务一定有 provider(runner 在出题那一步写进去的)。
+    // 默认按模型路径取,兜底路径的用例显式覆盖成 "local"。
+    provider: "minimax",
     questions: [
       {
         question: "什么是 RAG？",
@@ -266,12 +269,20 @@ describe("POST /api/interview/[jobId]/confirm", () => {
     expect(saveQuestionSetMock.mock.calls[0][0].provider).toBe("local");
   });
 
-  it("模型路径的任务,provider 记成 minimax", async () => {
+  it("模型路径的任务,provider 原样记进题库", async () => {
     createJob(makeJob({ provider: "minimax" }), { data: {} });
 
     await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
 
     expect(saveQuestionSetMock.mock.calls[0][0].provider).toBe("minimax");
+  });
+
+  it("DeepSeek 出的题,provider 记成 deepseek(不会被写成 minimax)", async () => {
+    createJob(makeJob({ provider: "deepseek" }), { data: {} });
+
+    await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
+
+    expect(saveQuestionSetMock.mock.calls[0][0].provider).toBe("deepseek");
   });
 
   it("入库后任务状态变 confirmed,并记住套 id", async () => {

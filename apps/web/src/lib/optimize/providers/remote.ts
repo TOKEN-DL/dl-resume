@@ -1,19 +1,23 @@
 /**
- * MiniMax provider —— 走 OpenAI 兼容接口。
+ * 远端 provider —— 走 OpenAI 兼容接口(DeepSeek / MiniMax 都吃这套协议)。
  *
  * 这里只放**业务层**:提示词与返回结构的拼装。
  * 「怎么发请求、怎么剥思考块、怎么抠 JSON」都在共享客户端
  * @/lib/llm/chat 里,面试押题等模块共用同一份,不要复制一份。
+ *
+ * 提示词与解析逻辑对各家模型是一样的,所以**只有一个**远端 provider ——
+ * 后端是谁由 @/lib/llm/chat 读环境变量决定,这里跟着取 id 与 label。
+ * 再接一家模型不用写新文件,改 @/lib/llm/chat 的注册表就行。
  *
  * 模型只用来做**内容级**的评价与改写;分数仍然由本地引擎按问题严重度算,
  * 保证「分数」和「用户看到的问题清单」永远自洽。
  */
 import { MODULE_LABELS, MODULE_ORDER, scoreOf } from "../analyzer";
 import { applyEdits, editableFields, type Edit } from "./edits";
-import type { Change, Finding, ModuleKey, ModuleReview, Severity } from "../types";
+import type { Finding, ModuleKey, ModuleReview, Severity } from "../types";
 import type { OptimizeProvider, RewriteInput, RewriteOutput, ReviewInput } from "./provider";
 import { stripHeavyFields } from "./provider";
-import { chat, extractJson, model } from "@/lib/llm/chat";
+import { chat, extractJson, model, provider, providerLabel } from "@/lib/llm/chat";
 
 /* ─── 评价 ─────────────────────────────────────────────────────── */
 
@@ -119,9 +123,9 @@ ${JSON.stringify(plan, null, 0)}
 
 /* ─── Provider ─────────────────────────────────────────────────── */
 
-export const minimaxProvider: OptimizeProvider = {
-  id: "minimax",
-  label: `MiniMax(${model()})`,
+export const remoteProvider: OptimizeProvider = {
+  id: provider(),
+  label: `${providerLabel()}(${model()})`,
 
   async review(input: ReviewInput): Promise<ModuleReview[]> {
     const text = await chat(REVIEW_SYSTEM, REVIEW_USER(input));
@@ -129,7 +133,7 @@ export const minimaxProvider: OptimizeProvider = {
       text,
     );
     if (!parsed || !Array.isArray(parsed.reviews)) {
-      throw new Error("MiniMax 返回的评价不是合法 JSON");
+      throw new Error(`${providerLabel()} 返回的评价不是合法 JSON`);
     }
 
     const byModule = new Map<ModuleKey, Finding[]>();
@@ -158,7 +162,7 @@ export const minimaxProvider: OptimizeProvider = {
     const text = await chat(REWRITE_SYSTEM, REWRITE_USER(input));
     const parsed = extractJson<{ edits?: unknown }>(text);
     if (!parsed || !Array.isArray(parsed.edits)) {
-      throw new Error("MiniMax 返回的改写结果不是合法 JSON");
+      throw new Error(`${providerLabel()} 返回的改写结果不是合法 JSON`);
     }
 
     // 模型只回补丁,我们在本地打到简历上:

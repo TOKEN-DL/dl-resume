@@ -115,6 +115,26 @@ const ITEM_3 = {
   createdAt: "2026-10-20T12:00:00.000Z",
 };
 
+/**
+ * DeepSeek 那套的题。
+ *
+ * 注意:**组是从题目反推出来的** —— 一套题没有题目就不会渲染出组头,
+ * 所以要测「DeepSeek 出的题」这组,得真的给它一道题。
+ */
+const ITEM_4 = {
+  id: "qi_4",
+  setId: "qs_3",
+  resumeId: "res_3",
+  resumeTitle: "DeepSeek 出的题",
+  question: "说说你对 TypeScript 泛型的理解",
+  answer: "类型参数化,编译期约束。",
+  topic: "TypeScript 泛型",
+  category: "basic",
+  difficulty: 2,
+  starred: false,
+  createdAt: "2026-11-05T12:00:00.000Z",
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -191,6 +211,29 @@ describe("QuestionBank", () => {
 
     expect(g2.querySelector("time")?.getAttribute("datetime")).toBe(SET_B.createdAt);
     expect(within(g2).getByText("1 题")).toBeTruthy();
+  });
+
+  it("组头标出生成引擎:模型后端与本地兜底各有中文名", async () => {
+    const SET_DEEPSEEK = {
+      id: "qs_3",
+      resumeId: "res_3",
+      resumeTitle: "DeepSeek 出的题",
+      provider: "deepseek",
+      createdAt: "2026-11-05T12:00:00.000Z",
+      count: 1,
+    };
+    installFetch({ items: [ITEM_1, ITEM_3, ITEM_4], sets: [SET_A, SET_B, SET_DEEPSEEK] });
+    render(<QuestionBank />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "DeepSeek 出的题" })).toBeTruthy(),
+    );
+
+    // 三种引擎各有一个中文名 —— deepseek 是新增的后端,
+    // minimax 是老库里已有的数据(要继续显示得对),local 是本地兜底。
+    expect(within(screen.getByRole("region", { name: "后端工程师简历" })).getByText("MiniMax")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "前端工程师简历" })).getByText("本地兜底")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "DeepSeek 出的题" })).getByText("DeepSeek")).toBeTruthy();
   });
 
   it("每道题都渲染成题卡:题干可见、答案默认收起", async () => {

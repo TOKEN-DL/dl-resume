@@ -98,10 +98,10 @@ export interface PlanItem {
 
 /** 一次优化的完整报告 */
 export interface OptimizeReport {
-  /** provider id:local / minimax */
+  /** provider id:local / deepseek / minimax */
   provider: string;
   providerLabel: string;
-  /** 实际用的引擎(可能因为 MiniMax 失败而回退) */
+  /** 实际用的引擎(可能因为远端模型失败而回退) */
   engineNote?: string;
   reviews: ModuleReview[];
   plan: PlanItem[];

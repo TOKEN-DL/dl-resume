@@ -21,7 +21,7 @@
 | 模板数量 | 17 | 3 |
 | 自定义模块 | 自由 section + 字段 | 预定义 8–10 个 |
 | 富文本 | 全文 TipTap | 仅描述段落 TipTap,其他结构化表单 |
-| AI 写作 | 已集成 | 已集成(简历优化 + 面试押题,用户自带 MiniMax key,无 key 时有本地兜底) |
+| AI 写作 | 已集成 | 已集成(简历优化 + 面试押题,用户自带大模型 key,支持 DeepSeek / MiniMax,无 key 时有本地兜底) |
 | PDF | 客户端 @react-pdf/renderer | 同款 |
 | 加密 | AES-256-GCM 正文 | 同款 |
 | 自托管 | Docker | 同款 |
@@ -84,7 +84,7 @@ MVP(F1–F19)之外,仓库已经落地的两块 AI 功能:
 
 | 版本 | 功能 | 交付形态 | 说明 |
 |---|---|---|---|
-| v1.2 | AI 简历优化 | `/optimize` | 后台跑,六节点进度条,产出可采纳的改写建议;用户自带 MiniMax key,没 key 时走本地规则引擎 |
+| v1.2 | AI 简历优化 | `/optimize` | 后台跑,六节点进度条,产出可采纳的改写建议;用户自带大模型 key(DeepSeek / MiniMax),没 key 时走本地规则引擎 |
 | v1.3 | AI 面试押题 + 我的题库 | `/interview` `/questions` | 针对一份简历出 12 道题(基础 + 深挖,从易到难),题干常显、参考答案折叠;每次押题存成一套进题库,重点关注/收藏可管理;**同一简历可反复押题,重复的题会被判重拦下,不会重复入库** |
 
 两块功能共用同一份模型客户端(`src/lib/llm/chat.ts`),端点、模型名、思考模式都可由环境变量覆盖。
@@ -149,6 +149,6 @@ MVP(F1–F19)之外,仓库已经落地的两块 AI 功能:
 - **ADR-005**: 登录方式: 仅邮箱密码 + 启动时 seed 一个管理员账号(env 读取, 不开放注册入口)
 - **ADR-006**: 隐私: 服务端 AES-256-GCM 加密, 密钥由用户密码派生
 - **ADR-007**: 部署: Docker 自托管为主, Vercel 路径留作可选
-- **ADR-008**: AI 接口预留 OpenAI 兼容协议, MVP 不实现(v1.2 起已实现,走 MiniMax 的 OpenAI 兼容端点)
+- **ADR-008**: AI 接口走 OpenAI 兼容协议(v1.2 起已实现),后端由 `LLM_PROVIDER` 选择(DeepSeek / MiniMax),加新后端只需在 `src/lib/llm/chat.ts` 的注册表加一项
 - **ADR-009**: 面试题库落 Prisma 两张表(`QuestionSet` / `QuestionItem`),用 `(userId, fingerprint)` 唯一索引在数据库层兜住「同一道题不重复入库」;`QuestionSet` 单独建表是因为套级判重必须按 `setId` 取回整套来算重复率
 - **ADR-010**: 押题任务表挂 `globalThis` 只存内存(TTL 2 小时),不落库 —— 押题流程的任务本身是临时的,落库还得额外处理过期清理;需要长期留存的题库数据另走 Prisma 表

@@ -140,7 +140,7 @@ test.describe("面试押题全链路", () => {
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
     await expect(page.getByRole("button", { name: "看参考答案" })).toHaveCount(QUESTION_COUNT);
 
-    // 走的是本地兜底模板引擎(空 MINIMAX_API_KEY)—— 确定性、可重复
+    // 走的是本地兜底模板引擎(空 LLM_API_KEY)—— 确定性、可重复
     await expect(page.getByText(/本地兜底/)).toBeVisible();
   });
 
@@ -197,7 +197,7 @@ test.describe("面试押题全链路", () => {
     await expect(page).toHaveURL(/\/questions/);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
 
-    // 组头标着生成引擎 —— 出题走的是本地兜底(空 MINIMAX_API_KEY),
+    // 组头标着生成引擎 —— 出题走的是本地兜底(空 LLM_API_KEY),
     // 入库时写进 provider 字段的就是它
     await expect(page.getByText("本地兜底").first()).toBeVisible();
   });

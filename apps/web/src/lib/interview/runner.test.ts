@@ -81,6 +81,7 @@ function makeJob(id: string, userId = "u1", data?: ResumeData): InterviewJob {
 }
 
 let savedKey: string | undefined;
+let savedLegacyKey: string | undefined;
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
@@ -90,16 +91,22 @@ beforeEach(() => {
   vi.mocked(listQuestionItems).mockResolvedValue([]);
   vi.mocked(listQuestionSetsByUser).mockReset();
   vi.mocked(listQuestionSetsByUser).mockResolvedValue([]);
-  // 明确走本地兜底路径 —— 用例不该依赖开发机有没有配密钥
-  savedKey = process.env.MINIMAX_API_KEY;
+  // 明确走本地兜底路径 —— 用例不该依赖开发机有没有配密钥。
+  // 两个变量都清:客户端读 key 时 LLM_API_KEY 为空会回退读 MINIMAX_API_KEY,
+  // 只清一个的话,开发机上的旧 key 会被读出来,用例就不确定了。
+  savedKey = process.env.LLM_API_KEY;
+  savedLegacyKey = process.env.MINIMAX_API_KEY;
+  process.env.LLM_API_KEY = "";
   process.env.MINIMAX_API_KEY = "";
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  if (savedKey === undefined) delete process.env.MINIMAX_API_KEY;
-  else process.env.MINIMAX_API_KEY = savedKey;
+  if (savedKey === undefined) delete process.env.LLM_API_KEY;
+  else process.env.LLM_API_KEY = savedKey;
+  if (savedLegacyKey === undefined) delete process.env.MINIMAX_API_KEY;
+  else process.env.MINIMAX_API_KEY = savedLegacyKey;
 });
 
 /* ─── 1. 跑完一轮 ─────────────────────────────────────────────────── */

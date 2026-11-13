@@ -2,15 +2,15 @@
  * 出题引擎 —— 把一份简历变成一组「题干 + 考点 + 难度 + 分类」,再补上参考答案。
  *
  * 两条出题路径:
- *   1. **模型路径**:配了 MINIMAX_API_KEY 时走 MiniMax。一次调用出全部题干,
- *      查重之后再用第二次调用补参考答案 —— 不在会被丢掉的题上白烧 token。
+ *   1. **模型路径**:配了 LLM_API_KEY 时走 OpenAI 兼容接口(DeepSeek / MiniMax)。
+ *      一次调用出全部题干,查重之后再用第二次调用补参考答案 —— 不在会被丢掉的题上白烧 token。
  *   2. **本地兜底**:没配密钥(或模型调不通)时,按技能名与项目名套模板出题,
  *      参考答案只给**要点提纲**。这时结果里一定带 engineNote,UI 上会明确标注。
  *
  * 这一层是**纯逻辑 + 两次模型调用**,不碰数据库、不管进度、不管权限。
  * 进度推进在 runner.ts,任务存储在 job-store.ts。
  */
-import { chat, extractJson, hasMiniMaxKey } from "@/lib/llm/chat";
+import { chat, extractJson, hasApiKey, provider } from "@/lib/llm/chat";
 import { checkDuplicate, type DedupCandidate } from "./dedupe";
 import { normalizeDifficulty } from "./difficulty";
 import { fingerprint } from "./fingerprint";
@@ -453,7 +453,7 @@ function errorText(e: unknown): string {
  * 这是生成前规避的第一道防线(也是主力防线)。
  *
  * 什么时候走本地兜底:
- *   - 没配 MINIMAX_API_KEY —— 主路径
+ *   - 没配 LLM_API_KEY —— 主路径
  *   - 模型调不通(网络/鉴权/超时)或输出根本不是 JSON —— 兜底并写明原因
  *
  * 什么时候**不**兜底:模型正常返回了但一道题都没有 ——
@@ -469,7 +469,7 @@ export async function generateQuestions(
   // 兜底模板是固定的:靠「组合去重」避开已经出过的题
   const local = (): GeneratedQuestion[] => buildLocalQuestions(scan, asked);
 
-  if (!hasMiniMaxKey()) {
+  if (!hasApiKey()) {
     return { questions: local(), provider: "local", engineNote: LOCAL_ENGINE_NOTE };
   }
 
@@ -499,7 +499,7 @@ export async function generateQuestions(
 
   return {
     questions: parsed.questions,
-    provider: "minimax",
+    provider: provider(),
     engineNote: parsed.topicMissing ? TOPIC_MISSING_NOTE : undefined,
   };
 }
@@ -516,7 +516,7 @@ export async function generateAnswers(
 ): Promise<AnswerOutcome> {
   const local = (): string[] => buildLocalAnswers(questions);
 
-  if (!hasMiniMaxKey()) {
+  if (!hasApiKey()) {
     return { answers: local(), engineNote: LOCAL_ENGINE_NOTE };
   }
 

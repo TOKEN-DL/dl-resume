@@ -1,7 +1,7 @@
 /**
  * 本地 provider —— 纯规则引擎,不需要任何外部服务或 key。
  *
- * 它是整个模块的**兜底**:没配 MiniMax key 时,优化流程依然完整可用
+ * 它是整个模块的**兜底**:没配 LLM_API_KEY 时,优化流程依然完整可用
  * (评价、方案、进度、确认入库全都工作),只是改写只做保守的结构性调整。
  */
 import { analyzeResume, summarize } from "../analyzer";

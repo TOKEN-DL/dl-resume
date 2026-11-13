@@ -2,8 +2,9 @@
  * Provider 抽象 —— 「智能体」的可插拔后端。
  *
  * 优化流程本身(节点推进、进度、方案生成)与「谁来做评价和改写」是解耦的:
- * 现在默认用 local(纯规则引擎),配上 MINIMAX_API_KEY 后自动切到 minimax。
- * 以后要接别的模型,实现这个接口就行,流程一行都不用改。
+ * 现在默认用 local(纯规则引擎),配上 LLM_API_KEY 后自动切到远端模型后端
+ * (DeepSeek / MiniMax,见 @/lib/llm/chat 的后端注册表)。
+ * 以后要接别的模型,改那个注册表就行,流程一行都不用改。
  */
 import type { Change, ModuleReview, PlanItem } from "../types";
 import type { ResumeData } from "@/lib/validation/resume";

@@ -4,16 +4,52 @@
  * 这里只测不依赖网络的逻辑:模型输出的 JSON 抠取、环境变量判定。
  * 真连模型要 key,不进单测。
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
+  apiKey,
   baseUrl,
   extractJson,
-  hasMiniMaxKey,
-  minimaxApiKey,
+  hasApiKey,
   model,
+  provider,
+  providerLabel,
   stripThinking,
   thinkingMode,
 } from "./chat";
+
+/**
+ * 临时改环境变量,测完还原。
+ *
+ * 这些函数读的是 process.env,单测必须把相关变量**全部**清干净 ——
+ * 开发机上真的配了 key 的话,不清就会读到真 key,用例结果随机器变。
+ */
+const TOUCHED = [
+  "LLM_PROVIDER",
+  "LLM_API_KEY",
+  "LLM_BASE_URL",
+  "LLM_MODEL",
+  "LLM_THINKING",
+  "MINIMAX_API_KEY",
+  "MINIMAX_BASE_URL",
+  "MINIMAX_MODEL",
+  "MINIMAX_THINKING",
+] as const;
+
+const saved = new Map<string, string | undefined>();
+
+function setEnv(name: string, value: string | undefined): void {
+  if (!saved.has(name)) saved.set(name, process.env[name]);
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
+afterEach(() => {
+  for (const [name, value] of saved) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  saved.clear();
+});
 
 describe("extractJson", () => {
   it("直接吐 JSON 就能解析", () => {
@@ -85,95 +121,155 @@ describe("stripThinking", () => {
   });
 });
 
-describe("hasMiniMaxKey", () => {
-  it("没有配 key 时返回 false(自动走本地引擎)", () => {
-    const saved = process.env.MINIMAX_API_KEY;
-    delete process.env.MINIMAX_API_KEY;
-    expect(hasMiniMaxKey()).toBe(false);
-    if (saved !== undefined) process.env.MINIMAX_API_KEY = saved;
+describe("provider", () => {
+  it("什么都没配时默认 DeepSeek", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    expect(provider()).toBe("deepseek");
+    expect(providerLabel()).toBe("DeepSeek");
   });
 
-  it("配了 key 时返回 true", () => {
-    const saved = process.env.MINIMAX_API_KEY;
-    process.env.MINIMAX_API_KEY = "sk-test";
-    expect(hasMiniMaxKey()).toBe(true);
-    if (saved === undefined) delete process.env.MINIMAX_API_KEY;
-    else process.env.MINIMAX_API_KEY = saved;
+  it("LLM_PROVIDER 可以切到 minimax", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "minimax");
+    expect(provider()).toBe("minimax");
+    expect(providerLabel()).toBe("MiniMax");
+  });
+
+  it("认不出的 LLM_PROVIDER 一律退回 deepseek", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "gpt-4o");
+    expect(provider()).toBe("deepseek");
+  });
+
+  it("老部署只配了 MINIMAX_* 时按 MiniMax 跑(不悄悄换供应商)", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("MINIMAX_API_KEY", "sk-legacy");
+    expect(provider()).toBe("minimax");
+  });
+
+  it("新变量配了就按新变量走,不看旧的", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("MINIMAX_API_KEY", "sk-legacy");
+    setEnv("LLM_API_KEY", "sk-new");
+    expect(provider()).toBe("deepseek");
+  });
+
+  it("LLM_PROVIDER 显式指定时优先级最高", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("MINIMAX_API_KEY", "sk-legacy");
+    setEnv("LLM_PROVIDER", "deepseek");
+    expect(provider()).toBe("deepseek");
   });
 });
 
-describe("minimaxApiKey", () => {
+describe("hasApiKey", () => {
+  it("没有配 key 时返回 false(自动走本地引擎)", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    expect(hasApiKey()).toBe(false);
+  });
+
+  it("配了 key 时返回 true", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_API_KEY", "sk-test");
+    expect(hasApiKey()).toBe(true);
+  });
+
+  it("旧的 MINIMAX_API_KEY 也认(向后兼容)", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("MINIMAX_API_KEY", "sk-legacy");
+    expect(hasApiKey()).toBe(true);
+  });
+});
+
+describe("apiKey", () => {
   it("没配 key 时是空串", () => {
-    const saved = process.env.MINIMAX_API_KEY;
-    delete process.env.MINIMAX_API_KEY;
-    expect(minimaxApiKey()).toBe("");
-    if (saved !== undefined) process.env.MINIMAX_API_KEY = saved;
+    for (const n of TOUCHED) setEnv(n, undefined);
+    expect(apiKey()).toBe("");
   });
 
   it("配了 key 时去掉首尾空白", () => {
-    const saved = process.env.MINIMAX_API_KEY;
-    process.env.MINIMAX_API_KEY = "  sk-test  ";
-    expect(minimaxApiKey()).toBe("sk-test");
-    if (saved === undefined) delete process.env.MINIMAX_API_KEY;
-    else process.env.MINIMAX_API_KEY = saved;
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_API_KEY", "  sk-test  ");
+    expect(apiKey()).toBe("sk-test");
+  });
+
+  it("两套都配时以 LLM_API_KEY 为准", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_API_KEY", "sk-new");
+    setEnv("MINIMAX_API_KEY", "sk-legacy");
+    expect(apiKey()).toBe("sk-new");
   });
 });
 
 describe("baseUrl", () => {
-  it("默认指向中国版端点", () => {
-    const saved = process.env.MINIMAX_BASE_URL;
-    delete process.env.MINIMAX_BASE_URL;
+  it("DeepSeek 默认指向官方端点", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "deepseek");
+    expect(baseUrl()).toBe("https://api.deepseek.com/v1");
+  });
+
+  it("MiniMax 默认指向中国版端点", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "minimax");
     expect(baseUrl()).toBe("https://api.minimaxi.com/v1");
-    if (saved !== undefined) process.env.MINIMAX_BASE_URL = saved;
   });
 
   it("可以用环境变量切到全球版,末尾斜杠会被去掉", () => {
-    const saved = process.env.MINIMAX_BASE_URL;
-    process.env.MINIMAX_BASE_URL = "https://api.minimax.io/v1/";
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "minimax");
+    setEnv("LLM_BASE_URL", "https://api.minimax.io/v1/");
     expect(baseUrl()).toBe("https://api.minimax.io/v1");
-    if (saved === undefined) delete process.env.MINIMAX_BASE_URL;
-    else process.env.MINIMAX_BASE_URL = saved;
+  });
+
+  it("旧的 MINIMAX_BASE_URL 也认", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("MINIMAX_BASE_URL", "https://api.minimax.io/v1");
+    expect(baseUrl()).toBe("https://api.minimax.io/v1");
   });
 });
 
 describe("model", () => {
-  it("默认用 MiniMax-M3", () => {
-    const saved = process.env.MINIMAX_MODEL;
-    delete process.env.MINIMAX_MODEL;
+  it("DeepSeek 默认用 deepseek-chat", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "deepseek");
+    expect(model()).toBe("deepseek-chat");
+  });
+
+  it("MiniMax 默认用 MiniMax-M3", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "minimax");
     expect(model()).toBe("MiniMax-M3");
-    if (saved !== undefined) process.env.MINIMAX_MODEL = saved;
   });
 
   it("可以用环境变量覆盖,全是空白时退回默认", () => {
-    const saved = process.env.MINIMAX_MODEL;
-    process.env.MINIMAX_MODEL = "   ";
-    expect(model()).toBe("MiniMax-M3");
-    if (saved === undefined) delete process.env.MINIMAX_MODEL;
-    else process.env.MINIMAX_MODEL = saved;
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_PROVIDER", "deepseek");
+    setEnv("LLM_MODEL", "   ");
+    expect(model()).toBe("deepseek-chat");
   });
 });
 
 describe("thinkingMode", () => {
   it("默认关掉思考(又快 5 倍,发现还更多)", () => {
-    const saved = process.env.MINIMAX_THINKING;
-    delete process.env.MINIMAX_THINKING;
+    for (const n of TOUCHED) setEnv(n, undefined);
     expect(thinkingMode()).toBe("disabled");
-    if (saved !== undefined) process.env.MINIMAX_THINKING = saved;
   });
 
-  it("MINIMAX_THINKING=adaptive 时开启思考", () => {
-    const saved = process.env.MINIMAX_THINKING;
-    process.env.MINIMAX_THINKING = "adaptive";
+  it("LLM_THINKING=adaptive 时开启思考", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_THINKING", "adaptive");
     expect(thinkingMode()).toBe("adaptive");
-    if (saved === undefined) delete process.env.MINIMAX_THINKING;
-    else process.env.MINIMAX_THINKING = saved;
   });
 
   it("认不出的值一律退回 disabled", () => {
-    const saved = process.env.MINIMAX_THINKING;
-    process.env.MINIMAX_THINKING = "on";
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("LLM_THINKING", "on");
     expect(thinkingMode()).toBe("disabled");
-    if (saved === undefined) delete process.env.MINIMAX_THINKING;
-    else process.env.MINIMAX_THINKING = saved;
+  });
+
+  it("旧的 MINIMAX_THINKING 也认", () => {
+    for (const n of TOUCHED) setEnv(n, undefined);
+    setEnv("MINIMAX_THINKING", "adaptive");
+    expect(thinkingMode()).toBe("adaptive");
   });
 });

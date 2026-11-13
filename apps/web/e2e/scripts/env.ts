@@ -99,16 +99,19 @@ export function e2eDatabaseUrl(appDir: string): string {
 /**
  * e2e 进程的环境变量。
  *
- * 两处关键覆盖:
+ * 三处关键覆盖:
  *   - DATABASE_URL:指向 e2e 专用库,不碰开发库
- *   - MINIMAX_API_KEY:置空。Next 的 env 加载逻辑是「进程环境里已经有这个键
- *     (哪怕值是空串)就不被 .env 覆盖」,所以空串能可靠地关掉模型路径,
+ *   - LLM_API_KEY / MINIMAX_API_KEY:都置空。Next 的 env 加载逻辑是「进程环境里
+ *     已经有这个键(哪怕值是空串)就不被 .env 覆盖」,所以空串能可靠地关掉模型路径,
  *     押题走本地兜底模板引擎 —— 确定性、可重复、不烧额度、不依赖网络。
+ *     两个变量都得清:客户端读 key 时 LLM_API_KEY 为空会回退读 MINIMAX_API_KEY,
+ *     只清一个的话,开发机上的旧 key 会被读出来,用例就不确定了。
  */
 export function e2eEnv(appDir: string): NodeJS.ProcessEnv {
   return {
     ...process.env,
     DATABASE_URL: e2eDatabaseUrl(appDir),
+    LLM_API_KEY: "",
     MINIMAX_API_KEY: "",
     NODE_ENV: "development",
   };

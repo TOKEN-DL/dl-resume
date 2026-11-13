@@ -21,24 +21,24 @@ import type {
   PlanItem,
 } from "./types";
 import { localProvider } from "./providers/local";
-import { hasMiniMaxKey } from "@/lib/llm/chat";
-import { minimaxProvider } from "./providers/minimax";
+import { hasApiKey, providerLabel } from "@/lib/llm/chat";
+import { remoteProvider } from "./providers/remote";
 import type { OptimizeProvider } from "./providers/provider";
 
 export interface ProviderChoice {
   provider: OptimizeProvider;
-  /** 实际生效的引擎说明(比如「MiniMax 失败,已回退本地规则引擎」) */
+  /** 实际生效的引擎说明(比如「DeepSeek 失败,已回退本地规则引擎」) */
   engineNote?: string;
 }
 
 /** 选 provider:有 key 用大模型,没有就用本地 */
 export function pickProvider(): ProviderChoice {
-  if (hasMiniMaxKey()) {
-    return { provider: minimaxProvider };
+  if (hasApiKey()) {
+    return { provider: remoteProvider };
   }
   return {
     provider: localProvider,
-    engineNote: "未配置 MINIMAX_API_KEY,当前使用本地规则引擎(结构体检 + 保守改写)。",
+    engineNote: "未配置 LLM_API_KEY,当前使用本地规则引擎(结构体检 + 保守改写)。",
   };
 }
 
@@ -120,7 +120,7 @@ export async function reviewWithAgent(
       reviews: mergeReviews(localReviews, remote),
       choice: {
         ...choice,
-        engineNote: choice.engineNote ?? "评价由本地规则引擎与 MiniMax 合并产出。",
+        engineNote: choice.engineNote ?? `评价由本地规则引擎与 ${providerLabel()} 合并产出。`,
       },
     };
   } catch (e) {
@@ -129,7 +129,7 @@ export async function reviewWithAgent(
       choice: {
         ...choice,
         provider: localProvider,
-        engineNote: `MiniMax 评价失败(${
+        engineNote: `${providerLabel()} 评价失败(${
           e instanceof Error ? e.message : "未知错误"
         }),已回退本地规则引擎。`,
       },
@@ -191,7 +191,7 @@ export async function rewriteWithAgent(
       choice: {
         ...choice,
         engineNote:
-          choice.engineNote ?? "改写由 MiniMax 完成,本地规则补齐了结构性问题。",
+          choice.engineNote ?? `改写由 ${providerLabel()} 完成,本地规则补齐了结构性问题。`,
       },
     };
   } catch (e) {
@@ -200,7 +200,7 @@ export async function rewriteWithAgent(
       choice: {
         ...choice,
         provider: localProvider,
-        engineNote: `MiniMax 改写失败(${
+        engineNote: `${providerLabel()} 改写失败(${
           e instanceof Error ? e.message : "未知错误"
         }),已回退本地规则引擎。`,
       },

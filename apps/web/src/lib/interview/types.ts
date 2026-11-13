@@ -94,8 +94,13 @@ export interface JobDedupeResult {
   hits: JobDedupeHit[];
 }
 
-/** 生成引擎 —— 模型路径还是本地兜底 */
-export type QuestionProvider = "minimax" | "local";
+/**
+ * 生成引擎 —— 模型路径还是本地兜底。
+ *
+ * 模型路径的取值跟 @/lib/llm/chat 的后端 id 对齐(deepseek / minimax),
+ * 加新后端时在这里加一项即可。
+ */
+export type QuestionProvider = "deepseek" | "minimax" | "local";
 
 /**
  * 模型出题阶段的产物 —— 还没有答案。

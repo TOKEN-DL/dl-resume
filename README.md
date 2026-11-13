@@ -78,6 +78,34 @@ npx tsc --noEmit   # 类型检查
 | `ADMIN_PASSWORD` | `changeme-on-first-login` | 管理员密码(**生产必须改**) |
 | `ADMIN_NAME` | `Admin` | 管理员姓名 |
 | `SEED_ADMIN_ENABLED` | `true` | 首次启动后改成 `false` 防止重复创建 |
+| `LLM_PROVIDER` | `deepseek` | 大模型后端:`deepseek` / `minimax` |
+| `LLM_API_KEY` | 空 | 大模型 key。**不配也能跑** —— 自动退回本地规则引擎 |
+| `LLM_BASE_URL` | 随后端 | 端点,一般不用填 |
+| `LLM_MODEL` | 随后端 | 模型名(`deepseek-chat` / `MiniMax-M3`) |
+| `LLM_THINKING` | `disabled` | 仅 MiniMax 生效:`adaptive` 开思考(慢 ~5 倍) |
+
+> 兼容旧变量 `MINIMAX_API_KEY` / `MINIMAX_BASE_URL` / `MINIMAX_MODEL` / `MINIMAX_THINKING`:
+> 只配了旧变量的部署仍按 MiniMax 后端跑,行为与旧版一致。
+
+### 接入大模型
+
+简历优化与面试押题共用一份 OpenAI 兼容客户端(`src/lib/llm/chat.ts`),DeepSeek 与 MiniMax 都吃这套协议:
+
+```bash
+# DeepSeek
+LLM_PROVIDER=deepseek
+LLM_API_KEY=sk-...
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-chat
+
+# MiniMax(中国版)
+LLM_PROVIDER=minimax
+LLM_API_KEY=ey...
+```
+
+没有 key 时两条链路都走**本地规则引擎**:优化只做结构体检 + 保守改写,押题按技能名套模板出题、参考答案只给要点提纲。UI 上会明确标注「本地兜底」,不会假装是模型出的。
+
+⚠️ **MiniMax 中国版与全球版的 key 不互通** —— 拿错域名会返回 `401 invalid api key (2049)`。全球版 key 要把 `LLM_BASE_URL` 设成 `https://api.minimax.io/v1`。
 
 ## Docker 部署(单条命令起)
 

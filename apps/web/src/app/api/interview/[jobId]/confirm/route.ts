@@ -49,9 +49,12 @@ const bodySchema = z.object({
  * 生成引擎 —— 任务里存着,原样写进题库的 provider 字段。
  *
  * 不用从「引擎说明」的文案里反推:文案是给人看的,改一个字就可能把来源标错。
+ *
+ * 也不再把非 local 的引擎一律写成 minimax —— 那会把 DeepSeek 出的题
+ * 标成 MiniMax。任务里的 provider 就是实际用的后端 id,直接取。
  */
 function providerOf(job: InterviewJob): string {
-  return job.provider === "local" ? "local" : "minimax";
+  return job.provider ?? "local";
 }
 
 /** 入库计划:哪些题写进去,哪些题跳过 */
