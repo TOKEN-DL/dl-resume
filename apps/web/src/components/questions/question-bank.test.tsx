@@ -1,15 +1,19 @@
 // @vitest-environment jsdom
 /**
- * QuestionBank —— 我的题库(按批次分组 / 收藏 / 删除 / 筛选同步到 URL)。
+ * QuestionBank —— 我的题库(三层折叠 / 题库管理 / 筛选同步到 URL)。
  *
- * 盯六件事:
- *   1. 按**批次**分组:组头显示来源简历、生成时间、题数
- *   2. 每道题都用共用的题卡渲染(题干常显、答案折叠)
- *   3. 收藏切换立刻生效,并回写接口
- *   4. 能删单题、删整套;删完整套后该组消失
- *   5. 顶部「再押一套」指向 /interview
- *   6. 空题库给提示,不白屏
- *   7. 筛选条件反映到 URL 上:刷新能恢复、非法值不崩、改筛选不进历史
+ * 结构是三层:题库(用户自建分组)› 套(一次押题) › 题。
+ *
+ * 盯九件事:
+ *   1. 题库默认折叠,套也默认折叠 —— 点开才看到下一层
+ *   2. 有筛选条件时,命中题目的题库与套自动展开(筛完看不见等于没筛)
+ *   3. 筛选条件一变,手动折叠状态重置
+ *   4. 套头显示来源简历、生成时间、题数、生成引擎
+ *   5. 每道题都用共用的题卡渲染(题干常显、答案折叠)
+ *   6. 收藏切换立刻生效,并回写接口
+ *   7. 能删单题、删整套、删题库(二次确认报「会删 N 套 M 题」)
+ *   8. 能新建题库、重命名题库;默认题库不能删
+ *   9. 筛选条件反映到 URL 上:刷新能恢复、非法值不崩、改筛选不进历史
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
@@ -54,8 +58,27 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+const COLLECTION_A = {
+  id: "qc_1",
+  name: "字节跳动",
+  isDefault: false,
+  setCount: 1,
+  questionCount: 2,
+  createdAt: "2026-11-01T12:00:00.000Z",
+};
+
+const COLLECTION_B = {
+  id: "qc_2",
+  name: "腾讯",
+  isDefault: false,
+  setCount: 1,
+  questionCount: 1,
+  createdAt: "2026-10-20T12:00:00.000Z",
+};
+
 const SET_A = {
   id: "qs_1",
+  collectionId: "qc_1",
   resumeId: "res_1",
   resumeTitle: "后端工程师简历",
   provider: "minimax",
@@ -66,6 +89,7 @@ const SET_A = {
 
 const SET_B = {
   id: "qs_2",
+  collectionId: "qc_2",
   resumeId: "res_2",
   resumeTitle: "前端工程师简历",
   provider: "local",
@@ -115,26 +139,6 @@ const ITEM_3 = {
   createdAt: "2026-10-20T12:00:00.000Z",
 };
 
-/**
- * DeepSeek 那套的题。
- *
- * 注意:**组是从题目反推出来的** —— 一套题没有题目就不会渲染出组头,
- * 所以要测「DeepSeek 出的题」这组,得真的给它一道题。
- */
-const ITEM_4 = {
-  id: "qi_4",
-  setId: "qs_3",
-  resumeId: "res_3",
-  resumeTitle: "DeepSeek 出的题",
-  question: "说说你对 TypeScript 泛型的理解",
-  answer: "类型参数化,编译期约束。",
-  topic: "TypeScript 泛型",
-  category: "basic",
-  difficulty: 2,
-  starred: false,
-  createdAt: "2026-11-05T12:00:00.000Z",
-};
-
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -146,17 +150,46 @@ function jsonResponse(body: unknown, status = 200) {
  * 装一个假的 fetch。
  * GET 返回列表;PATCH / DELETE 按方法分派,并把调用记录下来供断言。
  */
-function installFetch(opts: { items?: unknown[]; sets?: unknown[] } = {}) {
+function installFetch(
+  opts: { items?: unknown[]; sets?: unknown[]; collections?: unknown[] } = {},
+) {
   const items = opts.items ?? [ITEM_1, ITEM_2];
   const sets = opts.sets ?? [SET_A];
+  const collections = opts.collections ?? [COLLECTION_A];
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
+    // 题库管理接口先判 —— 它跟「收藏」都是 PATCH,别认错
+    if (String(url).includes("/api/question-collections")) {
+      if (method === "POST") {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { name: string };
+        return jsonResponse(
+          {
+            collection: {
+              id: "qc_new",
+              name: body.name,
+              isDefault: false,
+              setCount: 0,
+              questionCount: 0,
+              createdAt: "2026-11-10T12:00:00.000Z",
+            },
+          },
+          201,
+        );
+      }
+      if (method === "PATCH") {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { name: string };
+        return jsonResponse({ collection: { id: "qc_1", name: body.name } });
+      }
+      if (method === "DELETE") {
+        return jsonResponse({ ok: true, deletedSets: 1, deletedQuestions: 2 });
+      }
+    }
     if (method === "GET") {
-      return jsonResponse({ items, total: items.length, sets });
+      return jsonResponse({ items, total: items.length, sets, collections });
     }
     if (method === "PATCH") {
       const body = JSON.parse(String(init?.body ?? "{}")) as { starred: boolean };
-      const id = url.split("/").pop() ?? "";
+      const id = String(url).split("/").pop() ?? "";
       const target = items.find((i) => (i as { id: string }).id === id);
       return jsonResponse({
         item: { ...(target ?? {}), starred: body.starred },
@@ -192,53 +225,43 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("QuestionBank", () => {
-  it("按批次分组:组头显示来源简历、生成时间、题数", async () => {
-    installFetch({ items: [ITEM_1, ITEM_2, ITEM_3], sets: [SET_A, SET_B] });
+describe("QuestionBank · 三层折叠", () => {
+  it("题库默认折叠:题卡不在 DOM 里", async () => {
+    installFetch();
     render(<QuestionBank />);
 
-    // 两套各一个组(来源简历就是组名)
+    // 题库块头在,题卡不在
+    await waitFor(() => expect(screen.getByRole("heading", { level: 2 })).toBeTruthy());
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toContain("字节跳动");
+    expect(screen.queryByText(ITEM_1.question)).toBeNull();
+    expect(screen.queryByText(ITEM_2.question)).toBeNull();
+  });
+
+  it("展开题库 → 出现套;套仍然是折叠的(题卡还看不见)", async () => {
+    installFetch();
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /字节跳动/ }));
+
+    // 套出现了
     await waitFor(() =>
       expect(screen.getByRole("region", { name: "后端工程师简历" })).toBeTruthy(),
     );
-    const g1 = screen.getByRole("region", { name: "后端工程师简历" });
-    const g2 = screen.getByRole("region", { name: "前端工程师简历" });
-
-    // 组头:来源简历 + 生成时间 + 题数
-    expect(within(g1).getByRole("heading", { level: 2 }).textContent).toBe("后端工程师简历");
-    expect(g1.querySelector("time")?.getAttribute("datetime")).toBe(SET_A.createdAt);
-    expect(within(g1).getByText("2 题")).toBeTruthy();
-
-    expect(g2.querySelector("time")?.getAttribute("datetime")).toBe(SET_B.createdAt);
-    expect(within(g2).getByText("1 题")).toBeTruthy();
+    // 题卡还没出来 —— 套也默认折叠
+    expect(screen.queryByText(ITEM_1.question)).toBeNull();
   });
 
-  it("组头标出生成引擎:模型后端与本地兜底各有中文名", async () => {
-    const SET_DEEPSEEK = {
-      id: "qs_3",
-      resumeId: "res_3",
-      resumeTitle: "DeepSeek 出的题",
-      provider: "deepseek",
-      createdAt: "2026-11-05T12:00:00.000Z",
-      count: 1,
-    };
-    installFetch({ items: [ITEM_1, ITEM_3, ITEM_4], sets: [SET_A, SET_B, SET_DEEPSEEK] });
+  it("展开套 → 出现题卡(题干常显、答案收起)", async () => {
+    installFetch();
     render(<QuestionBank />);
 
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /字节跳动/ }));
     await waitFor(() =>
-      expect(screen.getByRole("region", { name: "DeepSeek 出的题" })).toBeTruthy(),
+      expect(screen.getByRole("region", { name: "后端工程师简历" })).toBeTruthy(),
     );
-
-    // 三种引擎各有一个中文名 —— deepseek 是新增的后端,
-    // minimax 是老库里已有的数据(要继续显示得对),local 是本地兜底。
-    expect(within(screen.getByRole("region", { name: "后端工程师简历" })).getByText("MiniMax")).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: "前端工程师简历" })).getByText("本地兜底")).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: "DeepSeek 出的题" })).getByText("DeepSeek")).toBeTruthy();
-  });
-
-  it("每道题都渲染成题卡:题干可见、答案默认收起", async () => {
-    installFetch({ items: [ITEM_1, ITEM_2], sets: [SET_A] });
-    render(<QuestionBank />);
+    fireEvent.click(screen.getByRole("button", { name: /后端工程师简历/ }));
 
     await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
     expect(screen.getByText(ITEM_2.question)).toBeTruthy();
@@ -247,6 +270,82 @@ describe("QuestionBank", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: "看参考答案" })[0]);
     expect(screen.getByText(ITEM_1.answer)).toBeTruthy();
+  });
+
+  it("折叠按钮带 aria-expanded,展开后为 true", async () => {
+    installFetch();
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    const toggle = screen.getByRole("button", { name: /字节跳动/ });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /字节跳动/ }).getAttribute("aria-expanded")).toBe(
+        "true",
+      ),
+    );
+  });
+
+  it("有筛选条件时,命中题目的题库与套自动展开", async () => {
+    nav.searchParams = new URLSearchParams("q=RAG");
+    installFetch({ items: [ITEM_1], sets: [SET_A], collections: [COLLECTION_A] });
+    render(<QuestionBank />);
+
+    // 筛完看不见等于没筛 —— 命中的块要自己展开
+    await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
+  });
+
+  it("筛选条件变化 → 手动折叠状态重置(不留在那儿自作主张)", async () => {
+    installFetch({ items: [ITEM_1, ITEM_2], sets: [SET_A], collections: [COLLECTION_A] });
+    render(<QuestionBank />);
+
+    // 先手动展开题库和套
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /字节跳动/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "后端工程师简历" })).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /后端工程师简历/ }));
+    await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
+
+    // 加一个筛选 → 命中块按自动口径展开
+    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
+    await waitFor(() => expect(nav.replace).toHaveBeenCalled());
+
+    // 把筛选清掉 → 手动折叠状态已被重置,块回到默认折叠
+    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "" } });
+    await waitFor(() => expect(screen.queryByText(ITEM_1.question)).toBeNull());
+  });
+});
+
+describe("QuestionBank · 套与题目", () => {
+  it("套头显示来源简历、生成时间、题数、生成引擎", async () => {
+    installFetch({ items: [ITEM_1, ITEM_2, ITEM_3], sets: [SET_A, SET_B], collections: [COLLECTION_A, COLLECTION_B] });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /字节跳动/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "后端工程师简历" })).toBeTruthy(),
+    );
+
+    const g1 = screen.getByRole("region", { name: "后端工程师简历" });
+    expect(within(g1).getByRole("heading", { level: 3 }).textContent).toContain(
+      "后端工程师简历",
+    );
+    expect(g1.querySelector("time")?.getAttribute("datetime")).toBe(SET_A.createdAt);
+    expect(within(g1).getByText("2 题")).toBeTruthy();
+    // 三种引擎各有一个中文名
+    expect(within(g1).getByText("MiniMax")).toBeTruthy();
+  });
+
+  it("题库块头显示几套几题", async () => {
+    installFetch({ items: [ITEM_1, ITEM_2], sets: [SET_A], collections: [COLLECTION_A] });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    expect(screen.getByText("1 套 · 2 题")).toBeTruthy();
   });
 
   it("顶部有「再押一套」入口,指向 /interview", async () => {
@@ -258,19 +357,26 @@ describe("QuestionBank", () => {
   });
 
   it("空题库给提示,不白屏", async () => {
-    installFetch({ items: [], sets: [] });
+    installFetch({ items: [], sets: [], collections: [] });
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText("题库还是空的")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("还没有题库")).toBeTruthy());
     // 空状态里也留着去押题的入口
     expect(screen.getByRole("link", { name: "去押一套" })).toBeTruthy();
   });
 
   it("收藏:点一下立刻变成「取消收藏」,并回写接口", async () => {
-    installFetch({ items: [ITEM_1, ITEM_2], sets: [SET_A] });
+    installFetch();
     render(<QuestionBank />);
 
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /字节跳动/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "后端工程师简历" })).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /后端工程师简历/ }));
     await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
+
     const star = screen.getAllByRole("button", { name: "收藏" })[0];
     fireEvent.click(star);
 
@@ -284,25 +390,18 @@ describe("QuestionBank", () => {
     });
   });
 
-  it("取消收藏:回写 starred:false", async () => {
-    installFetch({ items: [{ ...ITEM_3, setId: "qs_2" }], sets: [SET_B] });
+  it("删单题:题目从列表消失,套头题数减一", async () => {
+    installFetch();
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_3.question)).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "取消收藏" }));
-
-    await waitFor(() => {
-      const call = callOf("PATCH", "/api/questions/qi_3");
-      expect(call).toBeTruthy();
-      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ starred: false });
-    });
-  });
-
-  it("删单题:题目从列表消失,组头题数减一", async () => {
-    installFetch({ items: [ITEM_1, ITEM_2], sets: [SET_A] });
-    render(<QuestionBank />);
-
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /字节跳动/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "后端工程师简历" })).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /后端工程师简历/ }));
     await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
+
     fireEvent.click(screen.getAllByRole("button", { name: "删掉这道题" })[0]);
 
     await waitFor(() => expect(screen.queryByText(ITEM_1.question)).toBeNull());
@@ -313,48 +412,132 @@ describe("QuestionBank", () => {
     expect(call).toBeTruthy();
   });
 
-  it("删整套:整组消失,回到空状态", async () => {
-    installFetch({ items: [ITEM_1, ITEM_2], sets: [SET_A] });
+  it("删整套:整套从题库下消失", async () => {
+    installFetch();
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /字节跳动/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "后端工程师简历" })).toBeTruthy(),
+    );
+
     fireEvent.click(screen.getByRole("button", { name: "删掉这套" }));
 
-    await waitFor(() => expect(screen.getByText("题库还是空的")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "后端工程师简历" })).toBeNull(),
+    );
     expect(screen.queryByText(ITEM_1.question)).toBeNull();
 
     const call = callOf("DELETE", "/api/questions?setId=qs_1");
     expect(call).toBeTruthy();
   });
+});
 
-  it("筛选:勾「仅看收藏」后请求带上 starred=true", async () => {
-    installFetch({ items: [ITEM_3], sets: [SET_B] });
+describe("QuestionBank · 题库管理", () => {
+  it("新建题库:回写接口,并自动展开新库", async () => {
+    installFetch();
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_3.question)).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("仅看收藏"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "＋ 新建题库" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "＋ 新建题库" }));
+
+    fireEvent.change(screen.getByLabelText("题库名"), { target: { value: "美团" } });
+    fireEvent.click(screen.getByRole("button", { name: "建好" }));
 
     await waitFor(() => {
-      const call = fetchMock.mock.calls.find(([u]) =>
-        String(u).includes("/api/questions?") && String(u).includes("starred=true"),
-      );
+      const call = callOf("POST", "/api/question-collections");
       expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ name: "美团" });
     });
+
+    // 建好就展开 —— 用户刚建的库,得看得见
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /美团/ }).getAttribute("aria-expanded")).toBe(
+        "true",
+      ),
+    );
   });
 
-  it("筛选:选分类后请求带上 category=deep", async () => {
-    installFetch({ items: [ITEM_2], sets: [SET_A] });
+  it("新建题库:名字为空就不发请求", async () => {
+    installFetch();
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "＋ 新建题库" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "＋ 新建题库" }));
+    fireEvent.change(screen.getByLabelText("题库名"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "建好" }));
+
+    expect(callOf("POST", "/api/question-collections")).toBeFalsy();
+  });
+
+  it("重命名题库:回写接口并更新块头", async () => {
+    installFetch();
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "重命名" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "重命名" }));
+
+    fireEvent.change(screen.getByLabelText("题库名"), { target: { value: "字节跳动 · 后端" } });
+    fireEvent.click(screen.getByRole("button", { name: "改好" }));
 
     await waitFor(() => {
-      const call = fetchMock.mock.calls.find(([u]) =>
-        String(u).includes("/api/questions?") && String(u).includes("category=deep"),
-      );
+      const call = callOf("PATCH", "/api/question-collections/qc_1");
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({
+        name: "字节跳动 · 后端",
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 2 }).textContent).toContain("字节跳动 · 后端"),
+    );
+  });
+
+  it("删题库:二次确认报「会删几套几题」,确认后题库块消失", async () => {
+    installFetch();
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "删除" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+
+    // 二次确认要把代价说清楚
+    expect(screen.getByText(/会删掉 1 套 2 题/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
+
+    await waitFor(() => {
+      const call = callOf("DELETE", "/api/question-collections/qc_1");
       expect(call).toBeTruthy();
     });
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { level: 2 })).toBeNull(),
+    );
+  });
+
+  it("删题库:二次确认里取消,什么都不删", async () => {
+    installFetch();
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "删除" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(callOf("DELETE", "/api/question-collections/qc_1")).toBeFalsy();
+    expect(screen.getByRole("heading", { level: 2 })).toBeTruthy();
+  });
+
+  it("默认题库不能删:只给提示,不给删除按钮", async () => {
+    installFetch({
+      items: [],
+      sets: [],
+      collections: [{ ...COLLECTION_A, id: "qc_def", name: "默认题库", isDefault: true }],
+    });
+    render(<QuestionBank />);
+
+    await waitFor(() => expect(screen.getByText("默认题库")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "删除" })).toBeNull();
+    expect(screen.getByText("默认题库不能删")).toBeTruthy();
   });
 });
 
@@ -375,7 +558,7 @@ describe("QuestionBank 的 URL 同步", () => {
     render(<QuestionBank />);
 
     // 控件的选中态跟着 URL 走
-    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     expect((screen.getByLabelText("来源简历") as HTMLSelectElement).value).toBe("res_1");
     expect((screen.getByLabelText("分类") as HTMLSelectElement).value).toBe("deep");
     expect((screen.getByLabelText("难度") as HTMLSelectElement).value).toBe("4");
@@ -396,7 +579,7 @@ describe("QuestionBank 的 URL 同步", () => {
     installFetch({ items: [ITEM_2], sets: [SET_A] });
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
 
     await waitFor(() => {
@@ -411,7 +594,7 @@ describe("QuestionBank 的 URL 同步", () => {
     installFetch({ items: [ITEM_3], sets: [SET_B] });
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_3.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
     fireEvent.click(screen.getByLabelText("仅看收藏"));
     fireEvent.change(screen.getByLabelText("难度"), { target: { value: "3" } });
@@ -428,7 +611,7 @@ describe("QuestionBank 的 URL 同步", () => {
     installFetch({ items: [ITEM_2], sets: [SET_A] });
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
 
     await waitFor(() => expect(nav.replace).toHaveBeenCalled());
@@ -442,7 +625,7 @@ describe("QuestionBank 的 URL 同步", () => {
     installFetch({ items: [ITEM_2], sets: [SET_A] });
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     fireEvent.change(screen.getByLabelText("分类"), { target: { value: "" } });
 
     await waitFor(() => {
@@ -462,7 +645,7 @@ describe("QuestionBank 的 URL 同步", () => {
     render(<QuestionBank />);
 
     // 页面照常渲染,控件回到默认
-    await waitFor(() => expect(screen.getByText(ITEM_1.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     expect((screen.getByLabelText("分类") as HTMLSelectElement).value).toBe("");
     expect((screen.getByLabelText("难度") as HTMLSelectElement).value).toBe("");
     expect((screen.getByLabelText("仅看收藏") as HTMLInputElement).checked).toBe(false);
@@ -478,7 +661,7 @@ describe("QuestionBank 的 URL 同步", () => {
     installFetch({ items: [ITEM_2], sets: [SET_A] });
     const { rerender } = render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     nav.replace.mockClear();
 
     // 模拟用户手动改地址栏 / 前进后退:URL 变了,筛选要跟上
@@ -496,7 +679,7 @@ describe("QuestionBank 的 URL 同步", () => {
     installFetch({ items: [ITEM_2], sets: [SET_A] });
     render(<QuestionBank />);
 
-    await waitFor(() => expect(screen.getByText(ITEM_2.question)).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /字节跳动/ })).toBeTruthy());
     const before = fetchMock.mock.calls.length;
 
     fireEvent.change(screen.getByLabelText("分类"), { target: { value: "deep" } });
