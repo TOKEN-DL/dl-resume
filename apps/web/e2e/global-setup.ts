@@ -40,6 +40,17 @@ export default async function globalSetup(): Promise<void> {
   await context.get("/interview");
   await context.get("/questions");
 
+  // 预热**任务状态轮询路由** —— 这条最要紧,漏了会让用例随机失败。
+  //
+  // 前端就是靠 GET /api/interview/[jobId] 一秒一跳地拉进度(700ms 一跳)。
+  // dev 模式下第一次访问这个路由要现场编译,冷编译几十秒很常见 ——
+  // 而押题任务在后台几秒就跑完了:第一次轮询请求还在等编译,任务早跑完,
+  // 等它终于返回时拿到的直接就是「已完成」,中间那些节点状态一个都没渲染出来。
+  // 用例里「扫描节点从进行中走到已完成」这条断言就永远等不到。
+  //
+  // 传一个不存在的 jobId 就够 —— 路由会编译,返回 404 我们不关心。
+  await context.get("/api/interview/e2e-warmup");
+
   // ── 存登录态 ──
   const state = await context.storageState();
   const dir = e2eArtifactsDir(appDir);

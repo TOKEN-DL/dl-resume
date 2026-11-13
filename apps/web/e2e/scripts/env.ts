@@ -99,13 +99,16 @@ export function e2eDatabaseUrl(appDir: string): string {
 /**
  * e2e 进程的环境变量。
  *
- * 三处关键覆盖:
+ * 四处关键覆盖:
  *   - DATABASE_URL:指向 e2e 专用库,不碰开发库
  *   - LLM_API_KEY / MINIMAX_API_KEY:都置空。Next 的 env 加载逻辑是「进程环境里
  *     已经有这个键(哪怕值是空串)就不被 .env 覆盖」,所以空串能可靠地关掉模型路径,
  *     押题走本地兜底模板引擎 —— 确定性、可重复、不烧额度、不依赖网络。
  *     两个变量都得清:客户端读 key 时 LLM_API_KEY 为空会回退读 MINIMAX_API_KEY,
  *     只清一个的话,开发机上的旧 key 会被读出来,用例就不确定了。
+ *   - NEXT_DIST_DIR:e2e 的 next dev 写自己的构建目录。跟主 dev server 共用
+ *     .next-dev/ 时路由 manifest 会互相覆盖 —— 两个服务端里必有一个的页面全 404,
+ *     另一个报 ENOENT: .../server/pages/_document.js。
  */
 export function e2eEnv(appDir: string): NodeJS.ProcessEnv {
   return {
@@ -113,6 +116,7 @@ export function e2eEnv(appDir: string): NodeJS.ProcessEnv {
     DATABASE_URL: e2eDatabaseUrl(appDir),
     LLM_API_KEY: "",
     MINIMAX_API_KEY: "",
+    NEXT_DIST_DIR: ".next-e2e",
     NODE_ENV: "development",
   };
 }

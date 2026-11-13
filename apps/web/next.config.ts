@@ -9,7 +9,16 @@ const nextConfig = (phase: string): NextConfig => ({
   // `next build` 会用生产布局(chunks/、vendor-chunks/)覆盖 dev 的产物,
   // dev server 随后 require('./611.js') 就会 MODULE_NOT_FOUND。
   // 生产构建与 standalone 输出仍留在 .next/,Dockerfile 无需改动。
-  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
+  //
+  // **两个 next dev 之间也必须分开**:e2e 服务端(端口 3110)跟主 dev server
+  // (端口 3002)如果都写 .next-dev/,路由 manifest 会互相覆盖 ——
+  // 表现是其中一个服务端的页面**全部 404**,另一个随后报
+  // ENOENT: .../server/pages/_document.js。
+  // NEXT_DIST_DIR 由 e2e/scripts/env.ts 设成 .next-e2e,主 dev server 不设。
+  distDir:
+    phase === PHASE_DEVELOPMENT_SERVER
+      ? (process.env.NEXT_DIST_DIR?.trim() || ".next-dev")
+      : ".next",
   /**
    * 文件追踪根必须是**仓库根**,不是应用目录。
    *
