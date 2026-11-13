@@ -16,6 +16,9 @@ const saveQuestionSetMock = vi.fn();
 const findManyMock = vi.fn();
 const listQuestionItemsMock = vi.fn();
 const listQuestionSetsByUserMock = vi.fn();
+const getCollectionMock = vi.fn();
+const resolveTargetCollectionMock = vi.fn();
+const collectionFindUniqueMock = vi.fn();
 
 vi.mock("@/lib/session", () => ({
   getSession: () => getSessionMock(),
@@ -27,10 +30,18 @@ vi.mock("@/lib/interview/repo", () => ({
   listQuestionSetsByUser: (...args: unknown[]) => listQuestionSetsByUserMock(...args),
 }));
 
+vi.mock("@/lib/interview/collections-repo", () => ({
+  getCollection: (...args: unknown[]) => getCollectionMock(...args),
+  resolveTargetCollection: (...args: unknown[]) => resolveTargetCollectionMock(...args),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     questionItem: {
       findMany: (...args: unknown[]) => findManyMock(...args),
+    },
+    questionCollection: {
+      findUnique: (...args: unknown[]) => collectionFindUniqueMock(...args),
     },
   },
 }));
@@ -71,6 +82,19 @@ function itemRow(overrides: Record<string, unknown> = {}) {
     starred: false,
     createdAt: new Date("2026-11-01T08:00:00.000Z"),
     updatedAt: new Date("2026-11-01T08:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+/** 一个题库 */
+function collectionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "qc_1",
+    userId: "u1",
+    name: "字节跳动",
+    isDefault: false,
+    createdAt: new Date("2026-11-01T08:00:00.000Z"),
+    updatedAt: new Date("2026-11-01T09:00:00.000Z"),
     ...overrides,
   };
 }
@@ -139,6 +163,15 @@ beforeEach(() => {
 
   listQuestionSetsByUserMock.mockReset();
   listQuestionSetsByUserMock.mockResolvedValue([]);
+
+  getCollectionMock.mockReset();
+  getCollectionMock.mockResolvedValue(collectionRow());
+
+  resolveTargetCollectionMock.mockReset();
+  resolveTargetCollectionMock.mockResolvedValue(collectionRow({ id: "qc_2", name: "腾讯" }));
+
+  collectionFindUniqueMock.mockReset();
+  collectionFindUniqueMock.mockResolvedValue(null);
 });
 
 describe("POST /api/interview/[jobId]/confirm", () => {
@@ -506,5 +539,85 @@ describe("POST /api/interview/[jobId]/confirm · 跨套判重", () => {
 
     expect(listQuestionItemsMock).toHaveBeenCalledWith("u1");
     expect(listQuestionSetsByUserMock).toHaveBeenCalledWith("u1");
+  });
+});
+
+/**
+ * 存到哪个题库(自建分组)。
+ *
+ * 盯五件事:
+ *   1. 传了 collectionId → 这一套入库到该题库
+ *   2. 没传 → 落到最近更新的那个题库
+ *   3. 一个题库都没有 → 服务端自动建「默认题库」再用
+ *   4. 传了别人的题库 403、不存在的题库 404 —— 服务端不猜
+ *   5. 预览(preview)只算不写,不能顺手把默认题库建出来
+ */
+describe("POST /api/interview/[jobId]/confirm · 存到哪个题库", () => {
+  it("传了 collectionId:这一套入库到该题库", async () => {
+    createJob(makeJob(), { data: {} });
+
+    const res = await POST(post({ collectionId: "qc_1" }), {
+      params: Promise.resolve({ jobId: "iv_test" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(getCollectionMock).toHaveBeenCalledWith("qc_1", "u1");
+    expect(saveQuestionSetMock.mock.calls[0][0].collectionId).toBe("qc_1");
+    // 选了就别再去猜「最近更新的那个」
+    expect(resolveTargetCollectionMock).not.toHaveBeenCalled();
+  });
+
+  it("没传 collectionId:落到最近更新的那个题库", async () => {
+    createJob(makeJob(), { data: {} });
+
+    await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
+
+    expect(resolveTargetCollectionMock).toHaveBeenCalledWith("u1");
+    expect(saveQuestionSetMock.mock.calls[0][0].collectionId).toBe("qc_2");
+  });
+
+  it("一个题库都没有:服务端自动建默认题库再用", async () => {
+    resolveTargetCollectionMock.mockResolvedValue(
+      collectionRow({ id: "qc_default", name: "默认题库", isDefault: true }),
+    );
+    createJob(makeJob(), { data: {} });
+
+    await POST(post(), { params: Promise.resolve({ jobId: "iv_test" }) });
+
+    expect(saveQuestionSetMock.mock.calls[0][0].collectionId).toBe("qc_default");
+  });
+
+  it("传了别人的题库:403,不写库", async () => {
+    getCollectionMock.mockResolvedValue(null);
+    collectionFindUniqueMock.mockResolvedValue({ userId: "u2" });
+    createJob(makeJob(), { data: {} });
+
+    const res = await POST(post({ collectionId: "qc_other" }), {
+      params: Promise.resolve({ jobId: "iv_test" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(saveQuestionSetMock).not.toHaveBeenCalled();
+  });
+
+  it("传了不存在的题库:404,不写库", async () => {
+    getCollectionMock.mockResolvedValue(null);
+    createJob(makeJob(), { data: {} });
+
+    const res = await POST(post({ collectionId: "qc_nope" }), {
+      params: Promise.resolve({ jobId: "iv_test" }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(saveQuestionSetMock).not.toHaveBeenCalled();
+  });
+
+  it("预览只算不写:不该顺手把默认题库建出来", async () => {
+    createJob(makeJob(), { data: {} });
+
+    await POST(post({ preview: true }), { params: Promise.resolve({ jobId: "iv_test" }) });
+
+    expect(resolveTargetCollectionMock).not.toHaveBeenCalled();
+    expect(saveQuestionSetMock).not.toHaveBeenCalled();
   });
 });

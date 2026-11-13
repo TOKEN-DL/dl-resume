@@ -1,7 +1,7 @@
 /**
  * /api/questions —— 我的题库列表 + 删整套。
  *
- * 设计文档 §7 的契约:GET → { items, total, sets };DELETE ?setId=… → 删整套。
+ * 设计文档 §7 的契约:GET → { items, total, sets, collections };DELETE ?setId=… → 删整套。
  *
  * 一条硬规则:**一切读写都按 session.sub 过滤** —— 题库不共享,跨用户不可见。
  * 仓储层(listQuestionItems / deleteQuestionSet…)把 userId 作为必传参数收下,
@@ -14,8 +14,9 @@ import {
   countQuestionItems,
   deleteQuestionSet,
   listQuestionItems,
-  listQuestionSetsByUser,
+  listQuestionSetsByUserWithCounts,
 } from "@/lib/interview/repo";
+import { listCollectionsByUser } from "@/lib/interview/collections-repo";
 import { serializeItem } from "@/lib/interview/serialize";
 import { prisma } from "@/lib/prisma";
 
@@ -63,10 +64,11 @@ function readFilters(url: URL): Record<string, string> {
 /**
  * GET /api/questions —— 题库列表。
  *
- * 返回三段:
+ * 返回四段:
  *   - items:命中筛选的题目
  *   - total:命中筛选的题目总数(分页用)
- *   - sets:按批次分组的组信息,带 count(组头要显示题数)
+ *   - sets:按批次分组的组信息,带 count(组头要显示题数)和 collectionId(归到哪个题库)
+ *   - collections:用户自建的题库,带几套几题(题库块头要显示)
  *
  * sets 只包含**有命中题目**的套 —— 题都删光的组不占位置。
  */
@@ -89,10 +91,11 @@ export async function GET(req: Request) {
     ...(starred === undefined ? {} : { starred: starred === "true" }),
   };
 
-  const [items, total, allSets] = await Promise.all([
+  const [items, total, allSets, collections] = await Promise.all([
     listQuestionItems(session.sub, filter),
     countQuestionItems(session.sub, filter),
-    listQuestionSetsByUser(session.sub),
+    listQuestionSetsByUserWithCounts(session.sub),
+    listCollectionsByUser(session.sub),
   ]);
 
   // 组头题数 = 这一套里命中筛选的题数(跟下面实际渲染的卡片数一致)
@@ -105,6 +108,7 @@ export async function GET(req: Request) {
     .filter((s) => (countBySet.get(s.id) ?? 0) > 0)
     .map((s) => ({
       id: s.id,
+      collectionId: s.collectionId,
       resumeId: s.resumeId,
       resumeTitle: s.resumeTitle,
       provider: s.provider,
@@ -112,7 +116,34 @@ export async function GET(req: Request) {
       count: countBySet.get(s.id) ?? 0,
     }));
 
-  return NextResponse.json({ items: items.map(serializeItem), total, sets });
+  // 题库块头的「N 套 · M 题」按**全量**算 —— 块头说的是这个库里到底有多少,
+  // 不是当前筛选命中了多少(那是套那一层 count 的事)。
+  const setCountByCollection = new Map<string, number>();
+  const questionCountByCollection = new Map<string, number>();
+  for (const set of allSets) {
+    setCountByCollection.set(
+      set.collectionId,
+      (setCountByCollection.get(set.collectionId) ?? 0) + 1,
+    );
+    questionCountByCollection.set(
+      set.collectionId,
+      (questionCountByCollection.get(set.collectionId) ?? 0) + set.itemCount,
+    );
+  }
+
+  return NextResponse.json({
+    items: items.map(serializeItem),
+    total,
+    sets,
+    collections: collections.map((c) => ({
+      id: c.id,
+      name: c.name,
+      isDefault: c.isDefault,
+      setCount: setCountByCollection.get(c.id) ?? 0,
+      questionCount: questionCountByCollection.get(c.id) ?? 0,
+      createdAt: c.createdAt.toISOString(),
+    })),
+  });
 }
 
 /**

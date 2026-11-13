@@ -3,17 +3,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 /**
  * /api/questions —— 我的题库列表 + 删整套。
  *
- * 盯四件事:
+ * 盯五件事:
  *   1. 一切读写都按 session.sub 过滤 —— 题库不共享
  *   2. 列表按批次分组:sets 带题数,只含有命中题目的套
  *   3. 筛选参数(设计文档 §7)透传给仓储层,非法值 400
  *   4. 删整套:别人的套 403,不存在的套 404
+ *   5. 题库分组:collections 返回题库,sets 每项带 collectionId
  */
 
 const getSessionMock = vi.fn();
 const listQuestionItemsMock = vi.fn();
 const countQuestionItemsMock = vi.fn();
-const listQuestionSetsByUserMock = vi.fn();
+const listQuestionSetsByUserWithCountsMock = vi.fn();
+const listCollectionsByUserMock = vi.fn();
 const deleteQuestionSetMock = vi.fn();
 const questionSetFindUniqueMock = vi.fn();
 
@@ -24,8 +26,13 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/interview/repo", () => ({
   listQuestionItems: (...args: unknown[]) => listQuestionItemsMock(...args),
   countQuestionItems: (...args: unknown[]) => countQuestionItemsMock(...args),
-  listQuestionSetsByUser: (...args: unknown[]) => listQuestionSetsByUserMock(...args),
+  listQuestionSetsByUserWithCounts: (...args: unknown[]) =>
+    listQuestionSetsByUserWithCountsMock(...args),
   deleteQuestionSet: (...args: unknown[]) => deleteQuestionSetMock(...args),
+}));
+
+vi.mock("@/lib/interview/collections-repo", () => ({
+  listCollectionsByUser: (...args: unknown[]) => listCollectionsByUserMock(...args),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -64,11 +71,26 @@ function setRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "qs_1",
     userId: "u1",
+    collectionId: "qc_1",
     resumeId: "res_1",
     resumeTitle: "后端工程师简历",
     provider: "minimax",
     createdAt: new Date("2026-11-01T08:00:00.000Z"),
     updatedAt: new Date("2026-11-01T08:00:00.000Z"),
+    itemCount: 2,
+    ...overrides,
+  };
+}
+
+/** 一个题库 */
+function collectionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "qc_1",
+    userId: "u1",
+    name: "字节跳动",
+    isDefault: false,
+    createdAt: new Date("2026-11-01T08:00:00.000Z"),
+    updatedAt: new Date("2026-11-01T09:00:00.000Z"),
     ...overrides,
   };
 }
@@ -91,8 +113,11 @@ beforeEach(() => {
   countQuestionItemsMock.mockReset();
   countQuestionItemsMock.mockResolvedValue(1);
 
-  listQuestionSetsByUserMock.mockReset();
-  listQuestionSetsByUserMock.mockResolvedValue([setRow()]);
+  listQuestionSetsByUserWithCountsMock.mockReset();
+  listQuestionSetsByUserWithCountsMock.mockResolvedValue([setRow()]);
+
+  listCollectionsByUserMock.mockReset();
+  listCollectionsByUserMock.mockResolvedValue([collectionRow()]);
 
   deleteQuestionSetMock.mockReset();
   deleteQuestionSetMock.mockResolvedValue(true);
@@ -114,7 +139,8 @@ describe("GET /api/questions", () => {
     expect(res.status).toBe(200);
     expect(listQuestionItemsMock).toHaveBeenCalledWith("u1", {});
     expect(countQuestionItemsMock).toHaveBeenCalledWith("u1", {});
-    expect(listQuestionSetsByUserMock).toHaveBeenCalledWith("u1");
+    expect(listQuestionSetsByUserWithCountsMock).toHaveBeenCalledWith("u1");
+    expect(listCollectionsByUserMock).toHaveBeenCalledWith("u1");
   });
 
   it("返回 items / total / sets 三段,时间是 ISO 字符串", async () => {
@@ -144,7 +170,7 @@ describe("GET /api/questions", () => {
       itemRow({ id: "qi_2", setId: "qs_1" }),
       itemRow({ id: "qi_3", setId: "qs_2" }),
     ]);
-    listQuestionSetsByUserMock.mockResolvedValue([setRow(), setRow({ id: "qs_2" })]);
+    listQuestionSetsByUserWithCountsMock.mockResolvedValue([setRow(), setRow({ id: "qs_2" })]);
 
     const res = await GET(get());
     const body = await res.json();
@@ -156,7 +182,7 @@ describe("GET /api/questions", () => {
 
   it("没有命中题目的套不出现在 sets 里(不显示空组)", async () => {
     listQuestionItemsMock.mockResolvedValue([itemRow({ setId: "qs_1" })]);
-    listQuestionSetsByUserMock.mockResolvedValue([
+    listQuestionSetsByUserWithCountsMock.mockResolvedValue([
       setRow({ id: "qs_1" }),
       setRow({ id: "qs_empty" }),
     ]);
@@ -164,6 +190,62 @@ describe("GET /api/questions", () => {
     const res = await GET(get());
     const body = await res.json();
     expect(body.sets.map((s: { id: string }) => s.id)).toEqual(["qs_1"]);
+  });
+
+  it("sets 每项带 collectionId —— 页面据此分三层", async () => {
+    listQuestionItemsMock.mockResolvedValue([itemRow({ setId: "qs_1" })]);
+    listQuestionSetsByUserWithCountsMock.mockResolvedValue([
+      setRow({ id: "qs_1", collectionId: "qc_1" }),
+    ]);
+
+    const res = await GET(get());
+    const body = await res.json();
+    expect(body.sets[0].collectionId).toBe("qc_1");
+  });
+
+  it("返回 collections:题库带几套几题", async () => {
+    listCollectionsByUserMock.mockResolvedValue([
+      collectionRow({ id: "qc_1", name: "字节跳动" }),
+      collectionRow({ id: "qc_2", name: "腾讯" }),
+    ]);
+    listQuestionSetsByUserWithCountsMock.mockResolvedValue([
+      setRow({ id: "qs_1", collectionId: "qc_1", itemCount: 12 }),
+      setRow({ id: "qs_2", collectionId: "qc_1", itemCount: 12 }),
+      setRow({ id: "qs_3", collectionId: "qc_2", itemCount: 4 }),
+    ]);
+    listQuestionItemsMock.mockResolvedValue([itemRow({ setId: "qs_1" })]);
+
+    const res = await GET(get());
+    const body = await res.json();
+    const c1 = body.collections.find((c: { id: string }) => c.id === "qc_1");
+    const c2 = body.collections.find((c: { id: string }) => c.id === "qc_2");
+    expect(c1.name).toBe("字节跳动");
+    expect(c1.setCount).toBe(2);
+    expect(c1.questionCount).toBe(24);
+    expect(c2.setCount).toBe(1);
+    expect(c2.questionCount).toBe(4);
+  });
+
+  it("题库计数按全量算,不受筛选影响(块头显示的是库里到底有多少)", async () => {
+    listCollectionsByUserMock.mockResolvedValue([collectionRow({ id: "qc_1" })]);
+    listQuestionSetsByUserWithCountsMock.mockResolvedValue([
+      setRow({ id: "qs_1", collectionId: "qc_1", itemCount: 12 }),
+    ]);
+    // 筛选后只命中 1 道题
+    listQuestionItemsMock.mockResolvedValue([itemRow({ setId: "qs_1" })]);
+
+    const res = await GET(get());
+    const body = await res.json();
+    expect(body.sets[0].count).toBe(1);
+    expect(body.collections[0].questionCount).toBe(12);
+  });
+
+  it("一个题库都没有时 collections 是空数组,不是报错", async () => {
+    listCollectionsByUserMock.mockResolvedValue([]);
+
+    const res = await GET(get());
+    const body = await res.json();
+    expect(body.collections).toEqual([]);
   });
 
   it("筛选参数透传:category / difficulty / starred / q / setId / resumeId", async () => {

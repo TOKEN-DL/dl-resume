@@ -4,26 +4,35 @@
  *   POST  确认这一套押题题写入题库
  *
  * 设计文档 §7 的契约:POST …/confirm → { inserted, skipped, setId }。
- * 请求体:{ starredIndexes?: number[], preview?: boolean, force?: boolean }
+ * 请求体:{ starredIndexes?: number[], preview?: boolean, force?: boolean, collectionId?: string }
  *   - starredIndexes:押题页勾了「重点关注」的题目序号(对应 job.questions 的下标),
  *     入库时这些题直接落成 starred = true —— 入库前题目不在库里,收藏没有落点。
  *   - preview:只算不写。返回「会入库几题 / 会跳过几题」,给二次确认层如实报数用。
  *   - force:用户拍板。整套被判「高度重复」时,默认整套不入库;
  *     用户点了「仍要入库」就带上它 —— 只写入不重复的那几题。
+ *   - collectionId:存到哪个题库(用户自建的分组)。不给就落进最近更新的那个;
+ *     一个题库都没有时服务端自动建「默认题库」。
  *
- * 四条硬规则:
+ * 五条硬规则:
  *   1. 题库不共享 —— job.userId 必须等于 session.sub,否则 403。
  *   2. 幂等 —— 任务记着上次入库的套 id,重复确认直接返回那次的结果,不再写第二份。
  *   3. 重复题按题跳过 —— 跨套判重(R1 精确 / R2 近似 / R3 同考点)命中的题不写入,
  *     撞 (userId, fingerprint) 唯一约束的题也跳过;两条都不让整批回滚。
  *   4. 套级拦截 —— 本套与任一既有套的重复率 ≥ 55% 时整套不入库,
  *     除非用户拍板(force)。
+ *   5. 题库 id 服务端不猜 —— 传了错 id 就报 403/404,让用户重新选;
+ *     只有完全没传 collectionId 才走「最近更新的 / 自动建默认」。
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/session";
 import { getJob, updateJob } from "@/lib/interview/job-store";
 import { saveQuestionSet, type CreateQuestionItemInput } from "@/lib/interview/repo";
+import {
+  getCollection,
+  resolveTargetCollection,
+  type QuestionCollectionRow,
+} from "@/lib/interview/collections-repo";
 import {
   dedupeAgainstLibrary,
   loadLibrary,
@@ -43,7 +52,26 @@ const bodySchema = z.object({
   preview: z.boolean().optional(),
   /** 用户拍板:整套被判高度重复时仍然入库(只保留不重复的题) */
   force: z.boolean().optional(),
+  /** 存到哪个题库 —— 不给就落进最近更新的那个 */
+  collectionId: z.string().trim().min(1).optional(),
 });
+
+/**
+ * 题库不存在(404)还是别人的题库(403)?
+ *
+ * 仓储层对这两种情况都返回 null —— 它只按 userId 过滤。这里补一次**只读**探测
+ * 把两者分开:只取 userId,不取内容,别人的题库一个字都不会泄出去。
+ */
+async function rejectMissingCollection(id: string, userId: string) {
+  const owner = await prisma.questionCollection.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
+  if (owner && owner.userId !== userId) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  return NextResponse.json({ error: "not_found" }, { status: 404 });
+}
 
 /**
  * 生成引擎 —— 任务里存着,原样写进题库的 provider 字段。
@@ -138,7 +166,7 @@ export async function POST(
       { status: 400 },
     );
   }
-  const { starredIndexes = [], preview = false, force = false } = parsed.data;
+  const { starredIndexes = [], preview = false, force = false, collectionId } = parsed.data;
 
   // ── 幂等:已经入过库 → 直接返回上次那次的结果,不再写第二份 ──
   if (job.resultSetId) {
@@ -158,6 +186,15 @@ export async function POST(
   const questions = job.questions ?? [];
   if (questions.length === 0) {
     return NextResponse.json({ error: "no_questions" }, { status: 409 });
+  }
+
+  // ── 用户指定的题库:先验归属 ──
+  // 传了 id 就按它来,不存在或不是自己的直接报错 —— 服务端不猜,
+  // 猜错了用户会以为题存进了别的地方。
+  let targetCollection: QuestionCollectionRow | null = null;
+  if (collectionId) {
+    targetCollection = await getCollection(collectionId, session.sub);
+    if (!targetCollection) return rejectMissingCollection(collectionId, session.sub);
   }
 
   // ── 算一遍写入计划(跨套判重 + 指纹冲突) ──
@@ -190,6 +227,12 @@ export async function POST(
     );
   }
 
+  // ── 没指定题库:落到最近更新的那个;一个都没有就自动建「默认题库」 ──
+  // 放在预览之后 —— 预览是「只算不写」,不该顺手把默认题库建出来。
+  if (!targetCollection) {
+    targetCollection = await resolveTargetCollection(session.sub);
+  }
+
   // ── 写入:只写不重复的题 ──
   const starred = new Set(starredIndexes);
   const items: CreateQuestionItemInput[] = plan.keep.map(({ question, index }) => ({
@@ -204,6 +247,7 @@ export async function POST(
 
   const result = await saveQuestionSet({
     userId: session.sub,
+    collectionId: targetCollection.id,
     resumeId: job.source.resumeId,
     resumeTitle: job.title,
     provider: providerOf(job),
