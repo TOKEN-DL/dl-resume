@@ -44,6 +44,31 @@ function cards(page: Page): Locator {
   return page.locator("article");
 }
 
+/**
+ * 把题库页的两层折叠都打开 —— 题库 › 套 › 题。
+ *
+ * 题库和套都默认折叠,题卡压根不在 DOM 里。要数题卡,得先把它们展开。
+ *
+ * 锚点是标题层级:题库名在 h2 里,套的来源简历名在 h3 里。
+ * 先展开题库(套的按钮要等题库展开后才在 DOM 里),再展开套。
+ */
+async function openBank(page: Page): Promise<void> {
+  const main = page.locator("main");
+  // 题库块头的折叠按钮 —— 页面刚打开时数据还在路上,得等它出现
+  await main.locator("h2 button[aria-expanded]").first().waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+  for (const selector of ["h2 button[aria-expanded]", "h3 button[aria-expanded]"]) {
+    const toggles = main.locator(selector);
+    const n = await toggles.count();
+    for (let i = 0; i < n; i += 1) {
+      const toggle = toggles.nth(i);
+      if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+    }
+  }
+}
+
 /** 题卡的题干 —— 题卡里唯一的 <p> 就是题干(答案是 div,且折叠时不在 DOM 里) */
 function questionText(card: Locator): Locator {
   return card.locator(":scope > p");
@@ -195,7 +220,13 @@ test.describe("面试押题全链路", () => {
     // 去题库
     await page.getByRole("link", { name: "去题库" }).click();
     await expect(page).toHaveURL(/\/questions/);
+
+    // 题库 › 套 › 题 两层都默认折叠 —— 题卡不在 DOM 里,得先展开
+    await openBank(page);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
+
+    // 一个题库都没有时,服务端自动建了「默认题库」,那套就在它下面
+    await expect(page.getByRole("region", { name: "默认题库" })).toBeVisible();
 
     // 组头标着生成引擎 —— 出题走的是本地兜底(空 LLM_API_KEY),
     // 入库时写进 provider 字段的就是它
@@ -207,6 +238,7 @@ test.describe("面试押题全链路", () => {
    * ──────────────────────────────────────────────────────────── */
   test("收藏切换刷新后仍在;「仅看收藏」只剩被收藏的那道题", async ({ page }) => {
     await page.goto("/questions");
+    await openBank(page);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
 
     // 入库时勾了「重点关注」的那道题,落库后就是收藏态 —— 全页只有一道是收藏
@@ -233,6 +265,7 @@ test.describe("面试押题全链路", () => {
 
     // 刷新:收藏状态还在
     await page.reload();
+    await openBank(page);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
     await expect(page.getByRole("button", { name: "取消收藏" })).toHaveCount(1);
 
@@ -248,6 +281,7 @@ test.describe("面试押题全链路", () => {
    * ──────────────────────────────────────────────────────────── */
   test("题库筛选可用:条件写进 URL,刷新后仍在", async ({ page }) => {
     await page.goto("/questions");
+    await openBank(page);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
 
     // 分类:深挖 → 6 道
@@ -265,9 +299,10 @@ test.describe("面试押题全链路", () => {
     await expect(page).toHaveURL(/category=basic/);
     await expect(cards(page)).toHaveCount(DEEP_COUNT);
 
-    // 回到全部分类
+    // 回到全部分类 —— 筛选一清,折叠状态就重置了,得重新展开
     await page.getByLabel("分类").selectOption("");
     await expect(page).not.toHaveURL(/category=/);
+    await openBank(page);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
 
     // 难度:原理机制(第 3 档)→ 3 道
@@ -281,6 +316,7 @@ test.describe("面试押题全链路", () => {
 
     await page.getByLabel("难度").selectOption("");
     await expect(page).not.toHaveURL(/difficulty=/);
+    await openBank(page);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
 
     // 关键词:命中题干 / 答案 / 考点里的技能名
@@ -299,6 +335,7 @@ test.describe("面试押题全链路", () => {
   test("再押一次出的是全新题,入库后题库里一道重复都没有", async ({ page }) => {
     // 第一轮那 12 道已经入库了(前面的用例)—— 先把它们的题干抓下来
     await page.goto("/questions");
+    await openBank(page);
     await expect(cards(page)).toHaveCount(QUESTION_COUNT);
     const round1 = await questionTexts(cards(page));
 
@@ -326,6 +363,7 @@ test.describe("面试押题全链路", () => {
 
     // 题库变成 24 道,而且 24 道题的题干**两两不同**(去重后还是 24 条)
     await page.goto("/questions");
+    await openBank(page);
     await expect(cards(page)).toHaveCount(AFTER_SECOND_ROUND_COUNT);
     const all = await questionTexts(cards(page));
     expect(new Set(all).size).toBe(AFTER_SECOND_ROUND_COUNT);
@@ -352,6 +390,7 @@ test.describe("面试押题全链路", () => {
     await expect(page.getByText(/已入库 12 题/)).toBeVisible();
 
     await page.goto("/questions");
+    await openBank(page);
     await expect(cards(page)).toHaveCount(AFTER_NARROW_ROUND_COUNT);
 
     // ── 同一份简历再押一次:组合空间只有 12,这轮必然跟上一轮一模一样 ──
@@ -389,6 +428,94 @@ test.describe("面试押题全链路", () => {
 
     // 题库题数不变 —— 仍然是 36 道,一道都没多
     await page.goto("/questions");
+    await openBank(page);
     await expect(cards(page)).toHaveCount(AFTER_NARROW_ROUND_COUNT);
+  });
+});
+
+/**
+ * 题库自建分组 —— 题库 › 套 › 题 三层结构。
+ *
+ * 盯四件事:
+ *   1. 题库页能新建题库,建好出现第二个题库
+ *   2. 押题时能在确认层选「保存到」哪个题库
+ *   3. 选中的题库真的接住了这一套
+ *   4. 默认题库删不掉(它是用户的兜底容器)
+ *
+ * 跟在上面那组之后跑 —— 上面那组已经在库里落了 36 道题和 3 套,
+ * 这里接着在上面继续:新建的题库从零开始,再押一轮进它里面。
+ *
+ * 串行模式整个文件已经设过了(见文件头的 test.describe.configure)——
+ * 用例之间有前后依赖,不能并行。
+ */
+test.describe("题库自建分组", () => {
+  /** 新建的题库名 */
+  const NEW_COLLECTION = "字节跳动 · 后端";
+
+  test("题库页新建题库:建好出现第二个题库,历史套还留在默认题库里", async ({ page }) => {
+    await page.goto("/questions");
+
+    // 前面几轮入库时服务端自动建了「默认题库」,3 套都在它下面
+    await expect(page.getByRole("region", { name: "默认题库" })).toBeVisible();
+
+    await page.getByRole("button", { name: "＋ 新建题库" }).click();
+    await page.getByLabel("题库名").fill(NEW_COLLECTION);
+    await page.getByRole("button", { name: "建好" }).click();
+
+    // 新库出现了,默认题库也还在 —— 两个题库并存
+    await expect(page.getByRole("region", { name: NEW_COLLECTION })).toBeVisible();
+    await expect(page.getByRole("region", { name: "默认题库" })).toBeVisible();
+
+    // 新库是空的(还没往里放过题)
+    await openBank(page);
+    await expect(page.getByRole("region", { name: NEW_COLLECTION }).locator("article")).toHaveCount(0);
+    // 默认题库里的 36 道一道没少
+    await expect(page.getByRole("region", { name: "默认题库" }).locator("article")).toHaveCount(
+      AFTER_NARROW_ROUND_COUNT,
+    );
+  });
+
+  test("默认题库删不掉:只给提示,不给删除按钮", async ({ page }) => {
+    await page.goto("/questions");
+
+    const def = page.getByRole("region", { name: "默认题库" });
+    await expect(def.getByRole("button", { name: "删除" })).toHaveCount(0);
+    await expect(def.getByText("默认题库不能删")).toBeVisible();
+  });
+
+  test("押题时选「保存到」新建的题库:这一套就落在它下面", async ({ page }) => {
+    await page.goto("/interview");
+
+    // 上一个用例留下的任务还等着确认(整套被判重,一题都没入进去)——
+    // 押题页会接管它,得先放掉,回到来源选择。
+    const again = page.getByRole("button", { name: "再押一套" });
+    await again.waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined);
+    if (await again.count()) await again.click();
+
+    await expect(page.getByRole("button", { name: "开始押题" })).toBeVisible();
+    await resumeButton(page, RESUME_TITLE).click();
+    await page.getByRole("button", { name: "开始押题" }).click();
+    await expect(page.getByRole("heading", { name: "押题完成" })).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(cards(page)).toHaveCount(QUESTION_COUNT);
+
+    // 二次确认层:下拉里能选到刚才新建的题库
+    await page.getByRole("button", { name: "确认入库题库" }).click();
+    const dialog = page.getByRole("dialog", { name: "确认入库题库" });
+    await expect(dialog.getByText(/12 题入库 \/ 跳过 0 题重复/)).toBeVisible();
+    await dialog.getByLabel("保存到").selectOption({ label: NEW_COLLECTION });
+    await dialog.getByRole("button", { name: "确认入库" }).click();
+    await expect(page.getByText(/已入库 12 题/)).toBeVisible();
+
+    // 题库页:新题库底下多了这一套(12 道),默认题库还是原来那 36 道
+    await page.goto("/questions");
+    await openBank(page);
+    await expect(
+      page.getByRole("region", { name: NEW_COLLECTION }).locator("article"),
+    ).toHaveCount(QUESTION_COUNT);
+    await expect(page.getByRole("region", { name: "默认题库" }).locator("article")).toHaveCount(
+      AFTER_NARROW_ROUND_COUNT,
+    );
   });
 });
