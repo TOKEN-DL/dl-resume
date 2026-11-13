@@ -66,6 +66,19 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
     matchedSetTitle: string | null;
     matchedSetCreatedAt: number | null;
   } | null>(null);
+  /**
+   * 题库(用户自建的分组)—— 这一套题存到哪个库里。
+   *
+   * 打开二次确认层时拉一次;默认选中最近更新的那个(接口按最近更新倒序给)。
+   * 一个题库都没有时下拉显示「默认题库(自动创建)」,服务端入库时自己建。
+   */
+  const [collections, setCollections] = useState<
+    { id: string; name: string; isDefault: boolean }[]
+  >([]);
+  const [collectionId, setCollectionId] = useState("");
+  /** 「＋ 新建题库」的输入框开着没 */
+  const [newCollectionOpen, setNewCollectionOpen] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -228,6 +241,28 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
   const keepCount = dup ? Math.max(0, dup.totalCount - dup.duplicateCount) : 0;
 
   /**
+   * 拉一次题库列表。
+   *
+   * 拉不到就当没有题库 —— 服务端入库时会自己建一个「默认题库」,
+   * 这一层不该因为列表没拉下来就把入库堵住。
+   */
+  async function loadCollections() {
+    try {
+      const r = await fetch("/api/question-collections", { cache: "no-store" });
+      if (!r.ok) return;
+      const body = await r.json();
+      const list = (body.collections ?? []) as { id: string; name: string; isDefault: boolean }[];
+      setCollections(list);
+      // 默认选中最近更新的那个;用户已经选过别的就别抢
+      setCollectionId((cur) =>
+        list.some((c) => c.id === cur) ? cur : (list[0]?.id ?? ""),
+      );
+    } catch {
+      /* 拉不到就当没有题库 */
+    }
+  }
+
+  /**
    * 打开二次确认层。
    *
    * 先向服务端要一次「预览」—— 有几题会入库、有几题是库里已有的重复题。
@@ -238,6 +273,8 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
     setConfirmOpen(true);
     setPlan(null);
     setPlanFailed(false);
+    setNewCollectionOpen(false);
+    void loadCollections();
     try {
       const r = await fetch(`/api/interview/${job.id}/confirm`, {
         method: "POST",
@@ -255,17 +292,51 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
     }
   }
 
+  /** 在确认层里现建一个题库 —— 建好即选中 */
+  async function createCollection() {
+    const name = newCollectionName.trim();
+    if (!name) return;
+    try {
+      const r = await fetch("/api/question-collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const body = (await r.json().catch(() => ({}))) as {
+        collection?: { id: string; name: string; isDefault: boolean };
+        error?: string;
+      };
+      if (!r.ok || !body.collection) {
+        setError(
+          body.error === "duplicate_name" ? "已经有同名题库了,换个名字。" : "题库没建成,再试一次。",
+        );
+        return;
+      }
+      const created = body.collection;
+      setCollections((cur) => [created, ...cur]);
+      setCollectionId(created.id);
+      setNewCollectionOpen(false);
+      setNewCollectionName("");
+      setError(null);
+    } catch {
+      setError("题库没建成,再试一次。");
+    }
+  }
+
   /** 关掉二次确认层 —— 不写库,任务还能再确认 */
   function cancelConfirm() {
     setConfirmOpen(false);
     setPlan(null);
     setPlanFailed(false);
+    setNewCollectionOpen(false);
+    setNewCollectionName("");
   }
 
   /**
    * 确认入库。
    *
    * 把「重点关注」的题目序号一起递上去 —— 入库时这些题直接落成收藏。
+   * 把「保存到」的题库 id 也递上去 —— 这一套题归到哪个库由用户说了算。
    * 重复点确认不会写第二份:服务端认得这个任务已经入过库,直接把上次的
    * 结果原样返回。
    *
@@ -279,7 +350,11 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
       const r = await fetch(`/api/interview/${job.id}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ starredIndexes, ...(force ? { force: true } : {}) }),
+        body: JSON.stringify({
+          starredIndexes,
+          ...(force ? { force: true } : {}),
+          ...(collectionId ? { collectionId } : {}),
+        }),
       });
       const body = await r.json();
       if (!r.ok) {
@@ -451,6 +526,66 @@ export function InterviewWorkspace({ resumes }: { resumes: InterviewResumeItem[]
         >
           <div className={styles.cfDialog}>
             <h3 className={styles.cfDialogTitle}>确认入库题库</h3>
+
+            {/* 这一套题存到哪个库里 —— 题库是用户自建的分组 */}
+            <div className={styles.cfPick}>
+              <label className={styles.cfField}>
+                <span className={styles.cfFieldLabel}>保存到</span>
+                <select
+                  className={styles.cfSelect}
+                  value={collectionId}
+                  onChange={(e) => setCollectionId(e.target.value)}
+                >
+                  {collections.length === 0 ? (
+                    <option value="">默认题库(自动创建)</option>
+                  ) : (
+                    collections.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              {newCollectionOpen ? (
+                <form
+                  className={styles.cfNewForm}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void createCollection();
+                  }}
+                >
+                  <input
+                    className={styles.cfNewInput}
+                    aria-label="新题库名"
+                    value={newCollectionName}
+                    placeholder="题库名"
+                    onChange={(e) => setNewCollectionName(e.target.value)}
+                  />
+                  <button type="submit" className={styles.cfGhostBtn}>
+                    建好
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.cfGhostBtn}
+                    onClick={() => {
+                      setNewCollectionOpen(false);
+                      setNewCollectionName("");
+                    }}
+                  >
+                    取消
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.cfGhostBtn}
+                  onClick={() => setNewCollectionOpen(true)}
+                >
+                  ＋ 新建题库
+                </button>
+              )}
+            </div>
 
             {plan ? (
               <p className={styles.cfCounts}>

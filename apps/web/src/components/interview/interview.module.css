@@ -798,6 +798,69 @@
   line-height: 1.8;
 }
 
+/* 「保存到」—— 这一套题存到哪个题库里 */
+.cfPick {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  margin-top: 14px;
+}
+
+.cfField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cfFieldLabel {
+  color: var(--pencil);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.cfSelect {
+  min-width: 180px;
+  padding: 7px 10px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cfSelect:focus-visible {
+  outline: 2px solid var(--blue-soft);
+  outline-offset: 1px;
+}
+
+.cfNewForm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cfNewInput {
+  min-width: 140px;
+  padding: 7px 10px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cfNewInput:focus-visible {
+  outline: 2px solid var(--blue-soft);
+  outline-offset: 1px;
+}
+
 .cfActions {
   display: flex;
   align-items: center;

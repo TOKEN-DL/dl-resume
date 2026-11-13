@@ -83,9 +83,10 @@ function installFetch(jobSummary: Record<string, unknown> = job()) {
   });
 }
 
-/** 取所有**真正写入**的请求(把预览那发排除掉) */
+/** 取所有**真正写入**的请求(把预览那发排除掉,也不含题库管理接口) */
 function confirmCalls() {
-  return fetchMock.mock.calls.filter(([, init]) => {
+  return fetchMock.mock.calls.filter(([u, init]) => {
+    if (!String(u).includes("/confirm")) return false;
     const b = (init as RequestInit | undefined)?.body;
     return typeof b === "string" && !JSON.parse(b).preview;
   });
@@ -266,6 +267,129 @@ describe("押题页 · 整套高度重复", () => {
     );
     // 确认层关掉,提示条露出来
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+/**
+ * 确认入库时选库 —— 这一套题存到哪个题库里。
+ *
+ * 盯五件事:
+ *   1. 二次确认层有「保存到」下拉,列出用户的题库
+ *   2. 默认选中最近更新的那个题库
+ *   3. 换选之后,确认入库时把 collectionId 一起递上去
+ *   4. 一个题库都没有时,下拉显示「默认题库(自动创建)」,确认即建
+ *   5. 下拉旁边能「＋ 新建题库」,建好即选中
+ */
+describe("押题页 · 存到哪个题库", () => {
+  const COLLECTIONS = [
+    { id: "qc_1", name: "字节跳动", isDefault: false },
+    { id: "qc_2", name: "腾讯", isDefault: false },
+  ];
+
+  /** 装一个带题库接口的 fetch */
+  function installFetchWithCollections(collections: unknown[]) {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u === "/api/interview") return jsonResponse({ jobs: [job()] });
+      if (u.startsWith("/api/question-collections")) {
+        if ((init?.method ?? "GET").toUpperCase() === "POST") {
+          const body = JSON.parse(String(init?.body ?? "{}")) as { name: string };
+          return jsonResponse(
+            { collection: { id: "qc_new", name: body.name, isDefault: false } },
+            201,
+          );
+        }
+        return jsonResponse({ collections });
+      }
+      if (u.includes("/confirm")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { preview?: boolean };
+        if (body.preview) return jsonResponse({ inserted: 2, skipped: 1, setId: null });
+        return jsonResponse({ inserted: 2, skipped: 1, setId: "qs_1" });
+      }
+      return jsonResponse({ error: "unsupported" }, 400);
+    });
+  }
+
+  async function openDialog() {
+    render(<InterviewWorkspace resumes={[]} />);
+    await waitForResult();
+    fireEvent.click(screen.getByRole("button", { name: "确认入库题库" }));
+    await waitFor(() => expect(screen.getByLabelText("保存到")).toBeTruthy());
+  }
+
+  it("二次确认层有「保存到」下拉,列出用户的题库", async () => {
+    installFetchWithCollections(COLLECTIONS);
+    await openDialog();
+
+    const select = screen.getByLabelText("保存到") as HTMLSelectElement;
+    await waitFor(() => expect(select.options).toHaveLength(2));
+    expect(select.options[0].textContent).toBe("字节跳动");
+    expect(select.options[1].textContent).toBe("腾讯");
+  });
+
+  it("默认选中最近更新的那个题库", async () => {
+    installFetchWithCollections(COLLECTIONS);
+    await openDialog();
+
+    const select = screen.getByLabelText("保存到") as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe("qc_1"));
+  });
+
+  it("换选之后,确认入库时把 collectionId 一起递上去", async () => {
+    installFetchWithCollections(COLLECTIONS);
+    await openDialog();
+
+    const select = screen.getByLabelText("保存到") as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe("qc_1"));
+    fireEvent.change(select, { target: { value: "qc_2" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认入库" }));
+
+    await waitFor(() => expect(confirmCalls()).toHaveLength(1));
+    const body = JSON.parse(String(confirmCalls()[0][1].body));
+    expect(body.collectionId).toBe("qc_2");
+  });
+
+  it("一个题库都没有:下拉显示「默认题库(自动创建)」,确认时不带 collectionId", async () => {
+    installFetchWithCollections([]);
+    await openDialog();
+
+    const select = screen.getByLabelText("保存到") as HTMLSelectElement;
+    await waitFor(() => expect(select.options).toHaveLength(1));
+    expect(select.options[0].textContent).toBe("默认题库(自动创建)");
+    expect(select.value).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "确认入库" }));
+    await waitFor(() => expect(confirmCalls()).toHaveLength(1));
+    // 不给 id,服务端按「最近更新的 / 自动建默认」处理
+    expect(JSON.parse(String(confirmCalls()[0][1].body)).collectionId).toBeUndefined();
+  });
+
+  it("「＋ 新建题库」:建好即选中,入库时存进新库", async () => {
+    installFetchWithCollections(COLLECTIONS);
+    await openDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "＋ 新建题库" }));
+    fireEvent.change(screen.getByLabelText("新题库名"), { target: { value: "美团" } });
+    fireEvent.click(screen.getByRole("button", { name: "建好" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        ([u, i]) =>
+          String(u).includes("/api/question-collections") &&
+          (i as RequestInit | undefined)?.method === "POST",
+      );
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ name: "美团" });
+    });
+
+    // 建好即选中 —— 用户刚建的库就是他想要的那个
+    await waitFor(() =>
+      expect((screen.getByLabelText("保存到") as HTMLSelectElement).value).toBe("qc_new"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "确认入库" }));
+    await waitFor(() => expect(confirmCalls()).toHaveLength(1));
+    expect(JSON.parse(String(confirmCalls()[0][1].body)).collectionId).toBe("qc_new");
   });
 });
 
