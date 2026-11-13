@@ -23,6 +23,8 @@ model User {
   encryptedDek  EncryptedDek?
   questionSets  QuestionSet[]
   questionItems QuestionItem[]
+  /// 题库分组 —— 用户自建的命名分组,一套押题题归到某个题库里
+  questionCollections QuestionCollection[]
 
   @@map("users")
 }
@@ -65,6 +67,8 @@ model EncryptedDek {
 model QuestionSet {
   id          String   @id @default(cuid())
   userId      String
+  /// 所属题库(用户自建的分组)。套是批次,题库是批次之上的归类。
+  collectionId String
   /// 来源简历。存字符串不建外键:简历被删了题还在(题是用户资产,不该跟着简历消失)
   resumeId    String?
   resumeTitle String
@@ -75,9 +79,34 @@ model QuestionSet {
 
   user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   items QuestionItem[]
+  /// 所属题库。题库删了,里面的套与题跟着没(题库是分组,不是题的去处)。
+  collection QuestionCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([collectionId])
   @@map("question_sets")
+}
+
+/// 我的题库 —— 用户自建的命名分组,一套押题题归到某个题库里。
+///
+/// 题库是**分组视图**,不是去重边界:一道题在一个用户下仍然只有一份
+/// (QuestionItem 上的 (userId, fingerprint) 唯一索引没变)。
+model QuestionCollection {
+  id        String   @id @default(cuid())
+  userId    String
+  /// 题库名。同一个用户下不重名。
+  name      String
+  /// 系统兜底题库:用户一个题库都没有时自动建,名字叫「默认题库」,不可删。
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sets QuestionSet[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
+  @@map("question_collections")
 }
 
 /// 题库条目 —— 一道题 — 见 issue #17

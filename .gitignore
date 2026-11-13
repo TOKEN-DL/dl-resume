@@ -48,6 +48,7 @@ coverage/
 # Prisma / SQLite
 **/prisma/dev.db
 **/prisma/dev.db-journal
+**/prisma/dev.db.bak*
 **/prisma/migrations/dev.db*
 
 # E2E 测试专用的 SQLite 库(每次跑 e2e 重建,不进仓库)
