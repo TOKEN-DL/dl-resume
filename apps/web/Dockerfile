@@ -49,6 +49,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/prisma ./apps/web/prisma
+# skills/ 是提示词的正本(简历优化 / 面试押题的方法论与输出契约),
+# 运行时从磁盘读 —— 不带进去的话模型路径会因为缺提示词而退回本地引擎
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/skills ./apps/web/skills
 
 # 数据持久化目录
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data

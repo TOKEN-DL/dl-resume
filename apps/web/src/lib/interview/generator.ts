@@ -11,6 +11,7 @@
  * 进度推进在 runner.ts,任务存储在 job-store.ts。
  */
 import { chat, extractJson, hasApiKey, provider } from "@/lib/llm/chat";
+import { loadSkillSection, hasSkill } from "@/lib/llm/skill";
 import { checkDuplicate, type DedupCandidate } from "./dedupe";
 import { normalizeDifficulty } from "./difficulty";
 import { fingerprint } from "./fingerprint";
@@ -210,11 +211,9 @@ function targetOf(data: ResumeData): string {
 /**
  * 出题提示词。
  *
- * 三条硬约束写死在系统提示词里:
- *   - 严格 12 道,四档难度 × 3,基础/深挖按固定配比(设计文档 §5.2)
- *   - 每题必须带考点关键词,同一个考点只能出现一次(否则 R3 判重会自伤)
- *   - **绝不编造简历里没有的经历、公司、数字** —— 押题题库会被反复翻,
- *     编出来的题比没有题更糟
+ * 方法论与输出契约的正本是 `skills/resume-interview/SKILL.md` 的 questions 小节 ——
+ * 难度分档、基础/深挖配比、考点规范、避让规则全在那边。
+ * 部署者改那个文件就能调出题口径,不用动代码。
  *
  * existingQuestions 是这个用户**已经出过的题干**(生成前规避的第一道防线):
  * 带上它,模型就会绕开这些题 —— 换一种问法、换一个考点都不行。
@@ -228,24 +227,13 @@ export function buildQuestionPrompt(
 ): { system: string; user: string } {
   const asked = existingQuestions.map((q) => q.trim()).filter(Boolean);
 
-  const system = [
-    "你是一位资深技术面试官,正在针对候选人的简历出面试题。",
-    "",
-    "硬性要求:",
-    "1. 严格输出 12 道题,难度分布固定:难度 1(入门理解)3 题、难度 2(熟练使用)3 题、难度 3(原理机制)3 题、难度 4(场景深挖)3 题。",
-    "2. 分类分布固定:难度 1 与难度 2 各含 2 道基础(basic)与 1 道深挖(deep);难度 3 与难度 4 各含 1 道基础与 2 道深挖。基础与深挖各 6 道。",
-    "3. 每题必须带 topic(考点关键词,2-4 个词)。同一个考点在这 12 道题里只能出现一次。",
-    "4. 只依据简历里写到的内容提问。绝对不要编造简历里没有的经历、公司、项目、数字或成果。",
-    "5. 题干里不要出现表情符号。",
-    "6. 只输出 JSON,不要输出任何解释文字。输出格式:",
-    '{"questions":[{"question":"题干","topic":"考点","category":"basic|deep","difficulty":1}]}',
-  ];
-
-  if (asked.length > 0) {
-    system.push(
-      "7. 用户给出的「已出过的题目」绝对不要再出 —— 连换个说法、换个例子都不行,考点也要避开。",
+  const skill = loadSkillSection("resume-interview", "questions");
+  if (!skill) {
+    throw new Error(
+      "缺少 skills/resume-interview/SKILL.md,无法启用模型出题路径(本地兜底模板不受影响)",
     );
   }
+  const system = skill;
 
   const user = [
     `目标岗位:${targetOf(data)}`,
@@ -264,7 +252,7 @@ export function buildQuestionPrompt(
 
   user.push("", "请针对上面这份简历出 12 道面试题,严格按要求的分布输出。");
 
-  return { system: system.join("\n"), user: user.join("\n") };
+  return { system, user: user.join("\n") };
 }
 
 /**
@@ -277,17 +265,14 @@ export function buildAnswerPrompt(
   data: ResumeData,
   questions: GeneratedQuestion[],
 ): { system: string; user: string } {
-  const system = [
-    "你是一位资深技术面试官,正在为候选人的面试题给出参考答案要点。",
-    "",
-    "硬性要求:",
-    "1. 答案要具体、可背诵:给出可以照着讲的关键要点,不要写「要深入理解原理」这类空话。",
-    "2. 只依据简历里写到的内容作答,不要编造简历里没有的成果、数据或经历。",
-    "3. 答案里不要出现表情符号。",
-    "4. 只输出 JSON,不要输出任何解释文字。输出格式:",
-    '{"answers":[{"index":0,"answer":"参考答案要点"}]}',
-    "index 是下面题目清单里的序号(从 0 开始),每一道题都要有且只有一个答案。",
-  ].join("\n");
+  // 方法论与输出契约来自 `skills/resume-interview/SKILL.md` 的 answers 小节
+  const skill = loadSkillSection("resume-interview", "answers");
+  if (!skill) {
+    throw new Error(
+      "缺少 skills/resume-interview/SKILL.md,无法启用模型出题路径(本地兜底模板不受影响)",
+    );
+  }
+  const system = skill;
 
   const list = questions.map((q, index) => ({
     index,
@@ -469,7 +454,7 @@ export async function generateQuestions(
   // 兜底模板是固定的:靠「组合去重」避开已经出过的题
   const local = (): GeneratedQuestion[] => buildLocalQuestions(scan, asked);
 
-  if (!hasApiKey()) {
+  if (!hasApiKey() || !hasSkill("resume-interview")) {
     return { questions: local(), provider: "local", engineNote: LOCAL_ENGINE_NOTE };
   }
 
@@ -516,7 +501,7 @@ export async function generateAnswers(
 ): Promise<AnswerOutcome> {
   const local = (): string[] => buildLocalAnswers(questions);
 
-  if (!hasApiKey()) {
+  if (!hasApiKey() || !hasSkill("resume-interview")) {
     return { answers: local(), engineNote: LOCAL_ENGINE_NOTE };
   }
 

@@ -22,6 +22,7 @@ import type {
 } from "./types";
 import { localProvider } from "./providers/local";
 import { hasApiKey, providerLabel } from "@/lib/llm/chat";
+import { hasSkill } from "@/lib/llm/skill";
 import { remoteProvider } from "./providers/remote";
 import type { OptimizeProvider } from "./providers/provider";
 
@@ -31,10 +32,23 @@ export interface ProviderChoice {
   engineNote?: string;
 }
 
-/** 选 provider:有 key 用大模型,没有就用本地 */
+/**
+ * 选 provider:有 key 且有 skill 就用大模型,没有就用本地。
+ *
+ * 两个条件缺一不可:key 决定能不能调模型,skill 决定**拿什么提示词**调 ——
+ * `skills/resume-optimizer/SKILL.md` 缺失时模型路径没法跑(提示词没有正本),
+ * 这时候宁可退回本地规则引擎,也不要拿一份残缺的提示词去糊弄用户。
+ */
 export function pickProvider(): ProviderChoice {
-  if (hasApiKey()) {
+  if (hasApiKey() && hasSkill("resume-optimizer")) {
     return { provider: remoteProvider };
+  }
+  if (!hasSkill("resume-optimizer")) {
+    return {
+      provider: localProvider,
+      engineNote:
+        "缺少 skills/resume-optimizer/SKILL.md,当前使用本地规则引擎(结构体检 + 保守改写)。",
+    };
   }
   return {
     provider: localProvider,

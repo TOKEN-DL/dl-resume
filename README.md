@@ -107,6 +107,29 @@ LLM_API_KEY=ey...
 
 ⚠️ **MiniMax 中国版与全球版的 key 不互通** —— 拿错域名会返回 `401 invalid api key (2049)`。全球版 key 要把 `LLM_BASE_URL` 设成 `https://api.minimax.io/v1`。
 
+### skills/(提示词的正本)
+
+两条 AI 链路的方法论与输出契约写在 `apps/web/skills/` 里,不在代码里:
+
+| skill | 管什么 | 小节 |
+|---|---|---|
+| `resume-optimizer` | 简历审阅与改写 | `review`(逐模块体检)、`rewrite`(字段级改写) |
+| `resume-interview` | 简历面试押题 | `questions`(出题分布)、`answers`(参考答案要点) |
+
+运行时从磁盘读这些文件,喂给大模型当系统提示词。这样做的三个好处:
+
+- **一处修改,三边生效** —— 改 `skills/resume-optimizer/SKILL.md`,大模型的提示词、给人看的文档、agent 加载到的 skill 同时更新,不会各说各话
+- **部署者能自己调** —— 直接编辑 skill 文件就能改审阅口径与出题规则,不用改代码、不用重新构建
+- **同一份文件也是标准 skill** —— 结构符合 agent skill 规范,可以直接给 agent 用
+
+想换位置用 `SKILL_DIR` 环境变量(**排他性覆盖**,设了就只看那一个目录):
+
+```bash
+SKILL_DIR=/etc/dl-resume/skills
+```
+
+> skill 文件缺失时,模型路径会**整体退回本地引擎**并在 UI 上说明原因 —— 宁可给确定性的本地结果,也不拿一份残缺的提示词去糊弄用户。
+
 ## Docker 部署(单条命令起)
 
 ### 前置

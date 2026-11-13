@@ -18,19 +18,25 @@ import type { Finding, ModuleKey, ModuleReview, Severity } from "../types";
 import type { OptimizeProvider, RewriteInput, RewriteOutput, ReviewInput } from "./provider";
 import { stripHeavyFields } from "./provider";
 import { chat, extractJson, model, provider, providerLabel } from "@/lib/llm/chat";
+import { loadSkillSection } from "@/lib/llm/skill";
 
 /* ─── 评价 ─────────────────────────────────────────────────────── */
 
-export const REVIEW_SYSTEM = `你是一位资深中文简历顾问,负责逐个模块审阅求职者的简历。
-规则:
-1. 只指出**具体、可改**的问题,不要泛泛而谈「建议加强」这类空话。
-2. 每条问题必须给出 title(一句话结论)、detail(为什么有问题)、suggestion(具体怎么改)。
-3. 绝不编造用户没有提供的经历、公司、数字或成果。
-4. severity 只能是 error / warn / info 之一。
-5. target 指向出问题的字段路径,取值范围:
-   basics.name / basics.email / basics.phone / basics.label / basics.location /
-   summary / work / projects / skills / education / languages / awards / certificates / interests
-6. 只输出 JSON,不要任何解释文字。`;
+/**
+ * 审阅提示词 —— 来自 `skills/resume-optimizer/SKILL.md` 的 review 小节。
+ *
+ * 方法论与输出契约的正本是那个 skill 文件,不是这里:
+ * 部署者可以直接编辑它来调整审阅口径,不需要改代码、不需要重新构建。
+ */
+function reviewSystem(): string {
+  const prompt = loadSkillSection("resume-optimizer", "review");
+  if (!prompt) {
+    throw new Error(
+      "缺少 skills/resume-optimizer/SKILL.md,无法启用模型审阅路径(本地规则引擎不受影响)",
+    );
+  }
+  return prompt;
+}
 
 export const REVIEW_USER = (input: ReviewInput): string =>
   `请审阅下面这份简历,按模块给出评价。
@@ -68,12 +74,22 @@ function toFindings(raw: unknown, module: ModuleKey): Finding[] {
 
 /* ─── 改写 ─────────────────────────────────────────────────────── */
 
-const REWRITE_SYSTEM = `你是一位资深中文简历顾问,按给定的优化方案改写简历。
-铁律:
-1. **绝不编造**用户没有提供的公司、经历、项目、数字或成果。需要数字的地方保留原文,不要瞎填。
-2. 保留所有原有条目,只做方案要求的改动,不要删条目、不要改时间、不要改公司名。
-3. 文字用中文,风格具体、克制、以动词开头。
-4. 只输出 JSON,不要任何解释文字。`;
+/**
+ * 改写提示词 —— 来自 `skills/resume-optimizer/SKILL.md` 的 rewrite 小节。
+ *
+ * 铁律(不编造、保留条目、HTML 结构)写在 skill 里,与审阅小节同源 ——
+ * 两边对"什么是不可编造的"理解必须一致,否则会出现「审阅说不许编,
+ * 改写却编了一个」这种自相矛盾。
+ */
+function rewriteSystem(): string {
+  const prompt = loadSkillSection("resume-optimizer", "rewrite");
+  if (!prompt) {
+    throw new Error(
+      "缺少 skills/resume-optimizer/SKILL.md,无法启用模型改写路径(本地规则引擎不受影响)",
+    );
+  }
+  return prompt;
+}
 
 /**
  * 改写提示词。
@@ -128,7 +144,7 @@ export const remoteProvider: OptimizeProvider = {
   label: `${providerLabel()}(${model()})`,
 
   async review(input: ReviewInput): Promise<ModuleReview[]> {
-    const text = await chat(REVIEW_SYSTEM, REVIEW_USER(input));
+    const text = await chat(reviewSystem(), REVIEW_USER(input));
     const parsed = extractJson<{ reviews?: Array<{ module?: string; findings?: unknown[] }> }>(
       text,
     );
@@ -159,7 +175,7 @@ export const remoteProvider: OptimizeProvider = {
   },
 
   async rewrite(input: RewriteInput): Promise<RewriteOutput> {
-    const text = await chat(REWRITE_SYSTEM, REWRITE_USER(input));
+    const text = await chat(rewriteSystem(), REWRITE_USER(input));
     const parsed = extractJson<{ edits?: unknown }>(text);
     if (!parsed || !Array.isArray(parsed.edits)) {
       throw new Error(`${providerLabel()} 返回的改写结果不是合法 JSON`);
