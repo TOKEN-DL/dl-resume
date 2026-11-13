@@ -3,7 +3,7 @@
 /**
  * SiteNav —— 全站顶栏。
  *
- * 五个模块:首页 / 模板广场 / 智能优化 / 面试押题 / 我的简历。
+ * 六个模块:首页 / 模板广场 / 智能优化 / 面试押题 / 我的题库 / 我的简历。
  * 「我的简历」带一个下拉,下拉的第一项就是整块实心的「创建简历」主按钮,
  * 下面跟着最近编辑过的简历,再往下是模板广场 / 设置 / 退出登录。
  *
@@ -11,9 +11,11 @@
  * 里的入口用的是同一个符号,一眼能认出是同一个功能。
  * 「面试押题」用 ◎ 标记,同理。
  *
+ * 「我的题库」是押题之后的产出管理页,紧跟在「面试押题」后面。
+ *
  * 账号信息由 server 组件通过 props 传进来(email 为空 = 未登录),
  * 组件本身不碰 session —— 这样 /、/templates、/resumes、/optimize、/interview
- * 五个入口都能复用同一份导航,各自决定要不要读 session。
+ * /questions 六个入口都能复用同一份导航,各自决定要不要读 session。
  */
 
 import Link from "next/link";
@@ -44,12 +46,17 @@ export interface SiteNavProps {
  * mark 是给「智能优化」(✦)与「面试押题」(◎)用的标记,跟首页 CTA、
  * 简历列表里的入口一致。所有项都带 mark 字段(不用时给空串),
  * 渲染时就不用判空分支。
+ *
+ * 「我的题库」紧跟在「面试押题」后面 —— 它是押题的产出,
+ * 「出题 → 管题」连着看最顺。它不带 mark:带 ✦◎ 的是 AI 功能入口,
+ * 题库和「我的简历」一样是用户自己的数据。
  */
 const PRIMARY_LINKS = [
   { href: "/", label: "首页", mark: "" },
   { href: "/templates", label: "模板广场", mark: "" },
   { href: "/optimize", label: "智能优化", mark: "✦" },
   { href: "/interview", label: "面试押题", mark: "◎" },
+  { href: "/questions", label: "我的题库", mark: "" },
 ] as const;
 
 /** 默认值用常量,避免每次渲染都造一个新数组导致 useMemo 失效 */
@@ -266,7 +273,7 @@ export function SiteNav({ email, isAdmin = false, recent = NO_RESUMES }: SiteNav
         </div>
       </nav>
 
-      <div className={styles.right}>
+      <div className={styles.right} data-nav="right">
         <OptimizeBadge />
         {isAdmin && <span className={styles.adminTag}>ADMIN</span>}
         {signedIn ? (

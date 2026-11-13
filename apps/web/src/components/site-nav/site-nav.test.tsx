@@ -3,7 +3,7 @@
  * SiteNav —— 全站顶栏。
  *
  * 重点盯三件事:
- *   1. 五个模块(首页 / 模板广场 / 智能优化 / 面试押题 / 我的简历)都在,当前页有激活态
+ *   1. 六个模块(首页 / 模板广场 / 智能优化 / 面试押题 / 我的题库 / 我的简历)都在,当前页有激活态
  *   2. 「我的简历」的下拉里有一块**显眼的实心「创建简历」按钮**
  *   3. 未登录时点「创建简历」去登录页;已登录时建简历并跳编辑器
  */
@@ -42,13 +42,22 @@ function openMenu() {
 }
 
 describe("SiteNav", () => {
-  it("渲染出五个模块:首页 / 模板广场 / 智能优化 / 面试押题 / 我的简历", () => {
+  it("渲染出六个模块:首页 / 模板广场 / 智能优化 / 面试押题 / 我的题库 / 我的简历", () => {
     render(<SiteNav />);
     expect(screen.getByRole("link", { name: "首页" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "模板广场" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "智能优化" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "面试押题" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "我的题库" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "我的简历" })).toBeTruthy();
+  });
+
+  it("「我的题库」指向 /questions,不带 ✦◎ 标记", () => {
+    render(<SiteNav />);
+    const link = screen.getByRole("link", { name: "我的题库" });
+    expect(link.getAttribute("href")).toBe("/questions");
+    // 题库是用户自己的数据,不是 AI 功能入口 —— 不该带功能标记
+    expect(link.textContent).toBe("我的题库");
   });
 
   it("「智能优化」指向 /optimize,✦ 标记不进无障碍名", () => {
@@ -84,6 +93,15 @@ describe("SiteNav", () => {
     );
     expect(screen.getByRole("link", { name: "首页" }).getAttribute("aria-current")).toBeNull();
     expect(screen.getByRole("link", { name: "智能优化" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("在 /questions 上时「我的题库」带激活态", () => {
+    nav.pathname = "/questions";
+    render(<SiteNav />);
+    expect(screen.getByRole("link", { name: "我的题库" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "面试押题" }).getAttribute("aria-current")).toBeNull();
   });
 
   it("当前页的导航项带 aria-current=page", () => {
